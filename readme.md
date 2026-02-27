@@ -123,5 +123,8 @@ Supported operations:
 | Rocky / AlmaLinux | 🔜 Planned |
 
 ---
-📘 **Windows:** 👉 **[View API Documentation](./readme-window-api.md)**
-
+| OS | Status | Documentation |
+|----|--------|-------------|
+| 🪟 Windows | ✅ Supported | ⭐ **[Windows API Docs](./readme-window-api.md)** |
+| 🐧 Ubuntu | ✅ Supported | 🚧 Coming Soon |
+| 🟥 RHEL | ✅ Supported | 🚧 Coming Soon |
