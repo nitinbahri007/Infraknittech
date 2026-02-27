@@ -1,8 +1,68 @@
-Patch Management API
+# 📦 Patch Management API
 
-A lightweight Patch Management backend for managing Windows, Red Hat, and Ubuntu agents, devices, and updates.
+A lightweight Patch Management backend for managing **Windows, Red Hat (RHEL), and Ubuntu agents, devices, and updates**.
 
-Built for enterprise environments like SOC, NOC, data centers, and infrastructure automation platforms, enabling centralized patch visibility and control across heterogeneous operating systems.
+Built for enterprise environments like **SOC, NOC, data centers, and infrastructure automation platforms**, enabling centralized patch visibility and control across heterogeneous operating systems.
+
+---
+
+## 🚀 Core Capabilities
+
+This platform provides end-to-end patch lifecycle management across multiple operating systems.
+
+---
+
+### ✅ Device Inventory
+- Pull all registered agents/devices
+- Multi-OS support (Windows, Ubuntu, RHEL)
+- Online / Offline visibility
+- UUID-based tracking
+
+---
+
+### 🔍 Missing Patch Detection
+- Detect missing patches on a specific device
+- OS-aware patch scanning:
+  - Windows → KB updates
+  - Ubuntu → APT packages
+  - RHEL → YUM/DNF advisories
+- Severity tagging (Critical / Important / Optional)
+
+---
+
+### 📥 Patch Download
+- Download patches to central repository
+- OS-specific handling:
+  - Windows → KB packages
+  - Ubuntu → APT mirrors
+  - RHEL → RPM repositories
+- Patch caching for reuse
+
+---
+
+### 🚀 Patch Deployment
+Deploy patches to a specific device or group.
+
+Supported operations:
+- Single device deployment
+- Bulk deployment
+- OS-aware execution:
+  - Windows → PowerShell / WUSA
+  - Ubuntu → APT automation
+  - RHEL → YUM/DNF automation
+
+---
+
+## 🖥 Supported Operating Systems
+
+| OS | Status |
+|----|--------|
+| Windows Server / Desktop | ✅ Supported |
+| Ubuntu 18+ / 20+ / 22+ | ✅ Supported |
+| Red Hat Enterprise Linux | ✅ Supported |
+| Rocky / AlmaLinux | 🔜 Planned |
+
+---
 
 # Window
 ------------------------------------------------------------------------------
