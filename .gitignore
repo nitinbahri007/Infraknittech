@@ -1,7 +1,13 @@
+__pycache__/
+KB5031539/
+linux_patches/
 downloads/
 templates/
+kb/
+linux_patch/
 *.exe
 *.cab
 *.msu
 *.zip
-__pycache__/
+*.tar
+*.gz
