@@ -60,7 +60,7 @@ http://10.10.8.19:5000/api/devices
 
 ```json
 {
-count: 5,
+count: 4,
 devices: [
 {
 agent_id: "082b88df-5f84-472d-abac-e5ebb5be3998",
@@ -117,8 +117,7 @@ os_name: "Windows",
 os_version: "10.0.19045",
 status: "ONLINE",
 updated_at: "Fri, 27 Feb 2026 16:36:33 GMT"
-},
-{}
+}
 ]
 }
 ```
@@ -231,27 +230,76 @@ http://10.10.8.19:5000/api/devices?status=ONLINE
 
 ---
 
-## 📦 Real Production Response
+## 📦 Window missing patch listing 
+
+**GET** `/api/window-patch-missing`
+
+## 1️⃣ Get All  Window Missing Patches
+```
+http://10.10.8.19:5000/api/window-patch-missing
+
+```
 
 ```json
 {
-  "count": 5,
-  "devices": [
+  "count": 3,
+  "patch_missing": [
     {
-      "agent_id": "082b88df-5f84-472d-abac-e5ebb5be3998",
-      "agent_version": "1.0.0",
-      "hostname": "localhost.localdomain",
-      "id": 3,
-      "ip_address": "10.10.8.215",
-      "last_heartbeat": "Tue, 17 Feb 2026 06:03:22 GMT",
-      "os_architecture": "x86_64",
-      "os_name": "Red Hat Enterprise Linux",
-      "os_version": "10.0 (Coughlan)",
-      "status": "OFFLINE"
+      "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261",
+      "deploy_status": false,
+      "detected_at": "Tue, 17 Feb 2026 17:25:17 GMT",
+      "download_status": false,
+      "hostname": "DESKTOP-P72C934",
+      "id": 1,
+      "ip_address": "10.10.10.247",
+      "kb": "5031539",
+      "patch_id": null,
+      "patch_title": "2023-10 Servicing Stack Update for Windows 10 Version 22H2 for x64-based Systems (KB5031539)",
+      "severity": "Critical"
+    },
+    {
+      "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261",
+      "deploy_status": false,
+      "detected_at": "Tue, 17 Feb 2026 17:25:17 GMT",
+      "download_status": false,
+      "hostname": "DESKTOP-P72C934",
+      "id": 2,
+      "ip_address": "10.10.10.247",
+      "kb": "5066791",
+      "patch_id": null,
+      "patch_title": "2025-10 Cumulative Update for Windows 10 Version 22H2 for x64-based Systems (KB5066791)",
+      "severity": "Critical"
+    },
+    {
+      "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+      "deploy_status": false,
+      "detected_at": "Wed, 18 Feb 2026 13:27:32 GMT",
+      "download_status": false,
+      "hostname": "DESKTOP-B1I444V",
+      "id": 5,
+      "ip_address": "10.10.11.10",
+      "kb": "5031539",
+      "patch_id": null,
+      "patch_title": "2023-10 Servicing Stack Update for Windows 10 Version 22H2 for x64-based Systems (KB5031539)",
+      "severity": "Critical"
     }
   ]
 }
 ```
+
+## 📌 Query Parameters
+
+| Key        | Type   | Required | Single / Multiple | Description |
+|------------|--------|----------|------------------|-------------|
+| agent_id   | string | ❌ No | ✅ Single + Bulk | Single UUID or comma-separated agent IDs |
+| severity   | string | ❌ No | ✅ Single + Bulk | Patch severity (Critical, Important, Optional) |
+| kb         | string | ❌ No | ✅ Single + Bulk | Filter by KB numbers (e.g. KB5021234) |
+| hostname   | string | ❌ No | ✅ Single + Bulk | Supports comma-separated hostnames |
+| ip_address | string | ❌ No | ✅ Single + Bulk | Supports comma-separated IP addresses |
+
+
+## 1️⃣ Get Single  Missing Patches list by agent id 
+
 
 ---
 ---
