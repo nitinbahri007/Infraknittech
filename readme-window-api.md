@@ -342,7 +342,89 @@ http://10.10.8.19:5000/api/window-patch-missing?agent_id=7e26d1a4-3609-4964-b56d
 ```
 
 ```json
-{"count":6,"patch_missing":[{"agent_id":"7e26d1a4-3609-4964-b56d-fed2a8560261","deploy_status":false,"detected_at":"Tue, 17 Feb 2026 17:25:17 GMT","download_status":false,"hostname":"DESKTOP-P72C934","id":1,"ip_address":"10.10.10.247","kb":"5031539","patch_id":null,"patch_title":"2023-10 Servicing Stack Update for Windows 10 Version 22H2 for x64-based Systems (KB5031539)","severity":"Critical"},{"agent_id":"7e26d1a4-3609-4964-b56d-fed2a8560261","deploy_status":false,"detected_at":"Tue, 17 Feb 2026 17:25:17 GMT","download_status":false,"hostname":"DESKTOP-P72C934","id":2,"ip_address":"10.10.10.247","kb":"5066791","patch_id":null,"patch_title":"2025-10 Cumulative Update for Windows 10 Version 22H2 for x64-based Systems (KB5066791)","severity":"Critical"},{"agent_id":"3ba1b11e-6393-4e22-956b-1837aa5f3282","deploy_status":false,"detected_at":"Wed, 18 Feb 2026 13:27:32 GMT","download_status":false,"hostname":"DESKTOP-B1I444V","id":5,"ip_address":"10.10.11.10","kb":"5031539","patch_id":null,"patch_title":"2023-10 Servicing Stack Update for Windows 10 Version 22H2 for x64-based Systems (KB5031539)","severity":"Critical"},{"agent_id":"3ba1b11e-6393-4e22-956b-1837aa5f3282","deploy_status":false,"detected_at":"Wed, 18 Feb 2026 13:27:32 GMT","download_status":false,"hostname":"DESKTOP-B1I444V","id":6,"ip_address":"10.10.11.10","kb":"5066747","patch_id":null,"patch_title":"2025-10 Cumulative Update for .NET Framework 3.5, 4.8 and 4.8.1 for Windows 10 Version 22H2 for x64 (KB5066747)","severity":"Important"},{"agent_id":"3ba1b11e-6393-4e22-956b-1837aa5f3282","deploy_status":false,"detected_at":"Wed, 18 Feb 2026 13:27:32 GMT","download_status":false,"hostname":"DESKTOP-B1I444V","id":7,"ip_address":"10.10.11.10","kb":"5066791","patch_id":null,"patch_title":"2025-10 Cumulative Update for Windows 10 Version 22H2 for x64-based Systems (KB5066791)","severity":"Critical"},{"agent_id":"3ba1b11e-6393-4e22-956b-1837aa5f3282","deploy_status":false,"detected_at":"Wed, 18 Feb 2026 13:27:32 GMT","download_status":false,"hostname":"DESKTOP-B1I444V","id":8,"ip_address":"10.10.11.10","kb":"890830","patch_id":null,"patch_title":"Windows Malicious Software Removal Tool x64 - v5.138 (KB890830)","severity":"NotRated"}]}
+{
+  "count": 6,
+  "patch_missing": [
+    {
+      "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261",
+      "deploy_status": false,
+      "detected_at": "Tue, 17 Feb 2026 17:25:17 GMT",
+      "download_status": false,
+      "hostname": "DESKTOP-P72C934",
+      "id": 1,
+      "ip_address": "10.10.10.247",
+      "kb": "5031539",
+      "patch_id": null,
+      "patch_title": "2023-10 Servicing Stack Update for Windows 10 Version 22H2 for x64-based Systems (KB5031539)",
+      "severity": "Critical"
+    },
+    {
+      "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261",
+      "deploy_status": false,
+      "detected_at": "Tue, 17 Feb 2026 17:25:17 GMT",
+      "download_status": false,
+      "hostname": "DESKTOP-P72C934",
+      "id": 2,
+      "ip_address": "10.10.10.247",
+      "kb": "5066791",
+      "patch_id": null,
+      "patch_title": "2025-10 Cumulative Update for Windows 10 Version 22H2 for x64-based Systems (KB5066791)",
+      "severity": "Critical"
+    },
+    {
+      "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+      "deploy_status": false,
+      "detected_at": "Wed, 18 Feb 2026 13:27:32 GMT",
+      "download_status": false,
+      "hostname": "DESKTOP-B1I444V",
+      "id": 5,
+      "ip_address": "10.10.11.10",
+      "kb": "5031539",
+      "patch_id": null,
+      "patch_title": "2023-10 Servicing Stack Update for Windows 10 Version 22H2 for x64-based Systems (KB5031539)",
+      "severity": "Critical"
+    },
+    {
+      "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+      "deploy_status": false,
+      "detected_at": "Wed, 18 Feb 2026 13:27:32 GMT",
+      "download_status": false,
+      "hostname": "DESKTOP-B1I444V",
+      "id": 6,
+      "ip_address": "10.10.11.10",
+      "kb": "5066747",
+      "patch_id": null,
+      "patch_title": "2025-10 Cumulative Update for .NET Framework 3.5, 4.8 and 4.8.1 for Windows 10 Version 22H2 for x64 (KB5066747)",
+      "severity": "Important"
+    },
+    {
+      "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+      "deploy_status": false,
+      "detected_at": "Wed, 18 Feb 2026 13:27:32 GMT",
+      "download_status": false,
+      "hostname": "DESKTOP-B1I444V",
+      "id": 7,
+      "ip_address": "10.10.11.10",
+      "kb": "5066791",
+      "patch_id": null,
+      "patch_title": "2025-10 Cumulative Update for Windows 10 Version 22H2 for x64-based Systems (KB5066791)",
+      "severity": "Critical"
+    },
+    {
+      "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+      "deploy_status": false,
+      "detected_at": "Wed, 18 Feb 2026 13:27:32 GMT",
+      "download_status": false,
+      "hostname": "DESKTOP-B1I444V",
+      "id": 8,
+      "ip_address": "10.10.11.10",
+      "kb": "890830",
+      "patch_id": null,
+      "patch_title": "Windows Malicious Software Removal Tool x64 - v5.138 (KB890830)",
+      "severity": "NotRated"
+    }
+  ]
+}
 ```
 
 
