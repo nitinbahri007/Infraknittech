@@ -1,0 +1,7 @@
+downloads/
+templates/
+*.exe
+*.cab
+*.msu
+*.zip
+__pycache__/
