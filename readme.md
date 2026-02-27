@@ -1,5 +1,9 @@
+Patch Management API
 
-                                #patch management
+A lightweight Patch Management backend for managing Windows, Red Hat, and Ubuntu agents, devices, and updates.
+
+Built for enterprise environments like SOC, NOC, data centers, and infrastructure automation platforms, enabling centralized patch visibility and control across heterogeneous operating systems.
+
 # Window
 ------------------------------------------------------------------------------
 # 🖥 Devices API 
