@@ -1,3 +1,6 @@
+
+# Window api  DOucmentataion 
+------------------------------------------------------------------------------
 # 🖥 Devices API 
 
 Retrieve registered agents/devices from the Patch Server.
@@ -147,13 +150,6 @@ http://10.10.8.19:5000/api/devices?status=ONLINE
 ```
 
 ---
-
-## ⚡ Best Practices
-
-* Use bulk queries for dashboards
-* Use status filter for live monitoring
-* Cache responses for UI performance
-
 ---
 
 ## ✅ Common Usage
