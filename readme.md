@@ -30,6 +30,40 @@ The Patch Management system follows a **centralized architecture** where all int
 |----------------|---------------|-------------|
 | No Internet<br>Agent-Based<br>Secure LAN | No Internet<br>Agent-Based<br>Secure LAN | No Internet<br>Agent-Based<br>Secure LAN |
 
+## ⚙ How It Works
+
+### 1️⃣ Central Server (Internet Required)
+The Patch Management Server is the brain of the system.
+
+**Responsibilities:**
+- Fetch patches from internet repositories
+- Maintain patch cache
+- Scan devices for missing updates
+- Deploy patches to nodes
+- Provide REST APIs
+
+**Supported repositories:**
+- Microsoft Update Catalog
+- Ubuntu APT repositories
+- RHEL YUM/DNF repositories
+
+---
+
+### 2️⃣ Nodes / Agents (No Internet Required)
+Endpoints do **NOT require internet access**.
+
+**Supported nodes:**
+- Windows Servers / Desktops
+- Ubuntu Linux
+- Red Hat Enterprise Linux
+
+**Node responsibilities:**
+- Register with server
+- Report patch status
+- Receive deployment commands
+- Install patches locally
+
+
 ---
 
 ## 🚀 Core Capabilities
