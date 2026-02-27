@@ -26,8 +26,9 @@ The Patch Management system follows a **centralized architecture** where all int
     ┌───────────────┼────────────────┐
     │               │                │
     ▼               ▼                ▼
-| 🪟 Windows Node | 🐧 Ubuntu Node | 🟥 RHEL Node  |
-|(No Internet)   | (No Internet)  | (No Internet)  |
+| 🪟 Windows Node | 🐧 Ubuntu Node | 🟥 RHEL Node |
+|----------------|---------------|-------------|
+| No Internet<br>Agent-Based<br>Secure LAN | No Internet<br>Agent-Based<br>Secure LAN | No Internet<br>Agent-Based<br>Secure LAN |
 
 ---
 
