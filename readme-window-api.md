@@ -427,7 +427,112 @@ http://10.10.8.19:5000/api/window-patch-missing?agent_id=7e26d1a4-3609-4964-b56d
 }
 ```
 
+# 📦 DOwnload missing patch listing 
 
+**POST** `/api/window-download`
+
+## 1️⃣ POstman examples 
+
+POST /api/window-download
+
+### step 1 url 
+
+```
+http://10.10.8.19:5000/api/window-download
+```
+### step 2 header tab 
+
+```
+Content-Type: application/json
+```
+
+### step 3 body  single patch download 
+
+```
+{
+  "id": "20",
+  "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282"
+}
+
+```
+
+```json
+{
+  "status": "accepted",
+  "jobs": 1
+}
+
+```
+
+### step 4 body with multiple patch download 
+
+```
+[
+  {
+    "id": "22",
+    "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282"
+  },
+  {
+    "id": "23",
+    "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282"
+  }
+]
+```
+
+
+
+```json
+{
+  "status": "accepted",
+  "jobs": 2
+}
+
+```
+# 📦 Status of file downloading or not 
+
+**GET** `/api/window-progress-bar`
+
+## 1️⃣ POstman examples 
+
+### base url 
+
+```
+http://10.10.8.19:5000/api/window-progress-bar
+```
+
+###  1 single agent progress 
+
+```
+http://10.10.8.19:5000/api/window-progress-bar?agent_id=7e26d1a4-3609-4964-b56d-fed2a8560261
+```
+
+``` json 
+{"agent_id":"7e26d1a4-3609-4964-b56d-fed2a8560261",
+"patches":[{"agent_id":"7e26d1a4-3609-4964-b56d-fed2a8560261",
+            "kb":"KB5031539",
+            "progress":0,
+            "status":"READY_TO_INSTALL",
+            "updated_at":"Wed, 25 Feb 2026 15:27:28 GMT"},
+            {"agent_id":"7e26d1a4-3609-4964-b56d-fed2a8560261",
+            "kb":"KB5066791",
+            "progress":0,
+            "status":"READY_TO_INSTALL",
+            "updated_at":"Thu, 19 Feb 2026 12:08:28 GMT"}
+            ]}
+```
+
+### Patch Status Definitions
+
+The following table describes patch lifecycle states returned by the Window Progress API.
+
+| Status | Description | Progress Behavior |
+|--------|------------|------------------|
+| READY_TO_INSTALL | Patch has been detected by the agent but installation has not started yet. The patch may already be downloaded or queued for installation. | Typically 0% |
+| DOWNLOADING | Patch is currently being downloaded from Windows Update or an internal repository. | 1–99% |
+| INSTALLING | Patch installation is in progress on the target system. | Typically 80–99% |
+| COMPLETED | Patch has been successfully installed. A reboot may or may not be required depending on the update. | 100% |
+| FAILED | Patch installation failed due to an error such as network failure, dependency issues, or reboot requirements. | Any |
+| NOT_FOUND | Patch record not found for the given agent or KB identifier. | N/A |
 
 
 ---
