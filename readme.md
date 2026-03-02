@@ -126,5 +126,5 @@ Supported operations:
 | OS | Status | Documentation |
 |----|--------|-------------|
 | 🪟 Windows | ✅ Supported | ⭐ **[Windows API Docs](./readme-window-api.md)** |
-| 🐧 Ubuntu | ✅ Supported | 🚧 Coming Soon |
-| 🟥 RHEL | ✅ Supported | 🚧 Coming Soon |
+| 🐧 Ubuntu | ✅ Supported |⭐ **[Ubuntu API Docs](./readme-ubuntu-api.md)** |
+| 🟥 RHEL | ✅ Supported | ⭐ **[RHEL API Docs](./readme-redhat-api.md)** |
