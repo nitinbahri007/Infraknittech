@@ -227,3 +227,188 @@ http://10.10.8.19:5000/api/devices?status=ONLINE
 
 
 ---
+# 📦 ubuntu missing patch listing
+
+
+**GET** `api/linux-missing-patches`
+
+## 1️⃣ Get All  Window Missing Patches
+```
+http://10.10.8.19:5000/api/linux-missing-patches
+
+```
+```json 
+
+{
+count: 3,
+data: [
+{
+agent_id: "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+hostname: "EMS-Server",
+id: 20,
+installed_version: "2.4.9",
+ip_address: "10.10.10.91",
+latest_version: "2.4.14",
+package_name: "apt",
+patch_type: "outdated",
+scan_time: "Tue, 24 Feb 2026 17:57:09 GMT"
+},
+{},
+{
+agent_id: "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+hostname: "EMS-Server",
+id: 22,
+installed_version: "2.4.13",
+ip_address: "10.10.10.91",
+latest_version: "2.4.14",
+package_name: "apt-transport-https",
+patch_type: "outdated",
+scan_time: "Tue, 24 Feb 2026 17:57:09 GMT"
+},
+{
+agent_id: "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+hostname: "EMS-Server",
+id: 23,
+installed_version: "2.4.9",
+ip_address: "10.10.10.91",
+latest_version: "2.4.14",
+package_name: "apt-utils",
+patch_type: "outdated",
+scan_time: "Tue, 24 Feb 2026 17:57:09 GMT"
+}
+]
+}
+
+```
+
+## 2 Get Missing patch by agent id 
+
+```
+http://10.10.8.19:5000/api/linux-missing-patches?agent_id="c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef"
+
+```
+
+```json 
+{
+count: 3,
+data: [
+{
+agent_id: "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+hostname: "EMS-Server",
+id: 20,
+installed_version: "2.4.9",
+ip_address: "10.10.10.91",
+latest_version: "2.4.14",
+package_name: "apt",
+patch_type: "outdated",
+scan_time: "Tue, 24 Feb 2026 17:57:09 GMT"
+},
+{},
+{
+agent_id: "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+hostname: "EMS-Server",
+id: 22,
+installed_version: "2.4.13",
+ip_address: "10.10.10.91",
+latest_version: "2.4.14",
+package_name: "apt-transport-https",
+patch_type: "outdated",
+scan_time: "Tue, 24 Feb 2026 17:57:09 GMT"
+},
+{
+agent_id: "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+hostname: "EMS-Server",
+id: 23,
+installed_version: "2.4.9",
+ip_address: "10.10.10.91",
+latest_version: "2.4.14",
+package_name: "apt-utils",
+patch_type: "outdated",
+scan_time: "Tue, 24 Feb 2026 17:57:09 GMT"
+}
+]
+}
+```
+
+# 📦 DOwnload missing patch listing Ubuntu
+
+*POST** `/api/ubuntu-download`
+
+## 1️⃣ POstman examples 
+
+POST /api/ubuntu-download
+
+### step 1 url 
+
+```
+http://10.10.8.19:5000/api/ubuntu-download
+```
+### step 2 header tab 
+
+```
+Content-Type: application/json
+```
+
+### step 3 body  single patch download 
+
+```
+{
+  "id": "22",
+  "agent_id": "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef"
+}
+
+```
+
+```json
+{
+  "status": "accepted",
+  "jobs": 1
+}
+
+```
+
+### step 4 body with multiple patch download 
+
+```
+[
+  {
+    "id": "23",
+    "agent_id": "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef"
+  },
+  {
+    "id": "24",
+    "agent_id": "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef"
+  }
+]
+```
+
+
+
+```json
+{
+  "status": "accepted",
+  "jobs": 2
+}
+
+```
+
+# 📦 Status of file downloading or not 
+
+**GET** `/api/ubuntu-progress-bar`
+
+## 1️⃣ POstman examples 
+
+### base url 
+
+```
+http://10.10.8.19:5000/api/ubuntu-progress-bar
+```
+
+###  1 single agent progress 
+
+```
+http://10.10.8.19:5000/api/ubuntu-progress-bar?agent_id=c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef
+```
+
+
+
