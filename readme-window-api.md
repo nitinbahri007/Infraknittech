@@ -431,7 +431,7 @@ http://10.10.8.19:5000/api/window-patch-missing?agent_id=7e26d1a4-3609-4964-b56d
 
 **POST** `/api/window-download`
 
-## 1️⃣ POstman examples 
+## 1️⃣ POstman examples  
 
 POST /api/window-download
 
@@ -458,8 +458,14 @@ Content-Type: application/json
 
 ```json
 {
-  "status": "accepted",
-  "jobs": 1
+    "data": [
+        {
+            "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261",
+            "patch_title": "2023-10 Servicing Stack Update for Windows 10 Version 22H2 for x64-based Systems (KB5031539)"
+        }
+    ],
+    "job": 1,
+    "status": "accepted"
 }
 
 ```
@@ -469,11 +475,15 @@ Content-Type: application/json
 ```
 [
   {
-    "id": "22",
-    "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282"
+    "id": 1,
+    "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261"
   },
   {
-    "id": "23",
+    "id": 2,
+    "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261"
+  },
+  {
+    "id": 5,
     "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282"
   }
 ]
@@ -483,10 +493,26 @@ Content-Type: application/json
 
 ```json
 {
-  "status": "accepted",
-  "jobs": 2
+    "data": [
+        {
+            "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261",
+            "id": 1,
+            "patch_title": "2023-10 Servicing Stack Update for Windows 10 Version 22H2 for x64-based Systems (KB5031539)"
+        },
+        {
+            "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261",
+            "id": 2,
+            "patch_title": "2025-10 Cumulative Update for Windows 10 Version 22H2 for x64-based Systems (KB5066791)"
+        },
+        {
+            "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+            "id": 5,
+            "patch_title": "2023-10 Servicing Stack Update for Windows 10 Version 22H2 for x64-based Systems (KB5031539)"
+        }
+    ],
+    "job": 3,
+    "status": "accepted"
 }
-
 ```
 # 📦 Status of file downloading or not 
 
@@ -507,19 +533,62 @@ http://10.10.8.19:5000/api/window-progress-bar?agent_id=7e26d1a4-3609-4964-b56d-
 ```
 
 ``` json 
-{"agent_id":"7e26d1a4-3609-4964-b56d-fed2a8560261",
-"patches":[{"agent_id":"7e26d1a4-3609-4964-b56d-fed2a8560261",
-            "kb":"KB5031539",
-            "progress":0,
-            "status":"READY_TO_INSTALL",
-            "updated_at":"Wed, 25 Feb 2026 15:27:28 GMT"},
-            {"agent_id":"7e26d1a4-3609-4964-b56d-fed2a8560261",
-            "kb":"KB5066791",
-            "progress":0,
-            "status":"READY_TO_INSTALL",
-            "updated_at":"Thu, 19 Feb 2026 12:08:28 GMT"}
-            ]}
+{
+    "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261",
+    "patches": [
+        {
+            "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261",
+            "kb": "KB5066791",
+            "progress": 0,
+            "status": "READY_TO_INSTALL",
+            "updated_at": "Tue, 10 Mar 2026 13:52:57 GMT"
+        },
+        {
+            "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261",
+            "kb": "KB5031539",
+            "progress": 0,
+            "status": "READY_TO_INSTALL",
+            "updated_at": "Tue, 10 Mar 2026 13:49:15 GMT"
+        }
+    ]
+}
 ```
+###  2 multiple  agent progress 
+```
+http://10.10.8.19:5000/api/window-progress-bar?agent_id=3ba1b11e-6393-4e22-956b-1837aa5f3282,7e26d1a4-3609-4964-b56d-fed2a8560261
+```
+``` json 
+{
+    "agents": [
+        "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+        "7e26d1a4-3609-4964-b56d-fed2a8560261"
+    ],
+    "patches": [
+        {
+            "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+            "kb": "KB5031539",
+            "progress": 0,
+            "status": "READY_TO_INSTALL",
+            "updated_at": "Tue, 10 Mar 2026 13:49:14 GMT"
+        },
+        {
+            "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261",
+            "kb": "KB5066791",
+            "progress": 0,
+            "status": "READY_TO_INSTALL",
+            "updated_at": "Tue, 10 Mar 2026 13:52:57 GMT"
+        },
+        {
+            "agent_id": "7e26d1a4-3609-4964-b56d-fed2a8560261",
+            "kb": "KB5031539",
+            "progress": 0,
+            "status": "READY_TO_INSTALL",
+            "updated_at": "Tue, 10 Mar 2026 13:49:15 GMT"
+        }
+    ]
+}
+```
+
 
 ### Patch Status Definitions
 

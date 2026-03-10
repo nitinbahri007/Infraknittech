@@ -346,6 +346,7 @@ def get_agent_outages():
 
 
 # window download patch
+"""
 @app.route("/api/window-download", methods=["POST"])
 def api_download():
     data = request.get_json(force=True)
@@ -371,9 +372,71 @@ def api_download():
         jobs += 1
 
     return jsonify({"status": "accepted", "jobs": jobs})
+"""
+
+# window download patch new one 
+
+@app.route("/api/window-download", methods=["POST"])
+def api_download():
+    data = request.get_json(force=True)
+
+    if isinstance(data, dict):
+        data = [data]
+
+    results = []
+    jobs = 0
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    for item in data:
+        record_id = item.get("id")
+        agent_id = item.get("agent_id")
+
+        if not record_id or not agent_id:
+            continue
+
+        cursor.execute("""
+            SELECT id, patch_title
+            FROM patch_missing
+            WHERE id = %s AND agent_id = %s
+        """, (record_id, agent_id))
+
+        row = cursor.fetchone()
+
+        if not row:
+            continue
+
+        patch_title = row["patch_title"]
+
+        threading.Thread(
+            target=process_patch,
+            args=(agent_id, patch_title),
+            daemon=True
+        ).start()
+
+        jobs += 1
+
+        results.append({
+            "id": row["id"],
+            "agent_id": agent_id,
+            "patch_title": patch_title
+        })
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({
+        "job": jobs,
+        "status": "accepted",
+        "data": results
+    })
 
 
-# ================= Window PROGRESS API =================
+# ================= Window PROGRESS API ================= 
+
+# old progress bar 
+"""
 @app.route("/api/window-progress-bar", methods=["GET"])
 def api_progress():
     agent_id = request.args.get("agent_id")
@@ -391,7 +454,42 @@ def api_progress():
         "agent_id": agent_id,
         "patches": rows
     })
+"""
+# window latest progress bar latest
 
+@app.route("/api/window-progress-bar", methods=["GET"])
+def api_progress():
+    agent_ids = request.args.get("agent_id")
+    kbs = request.args.get("kb")
+
+    if not agent_ids:
+        return jsonify({"error": "agent_id required"}), 400
+
+    # comma separated → list
+    agent_ids = [a.strip() for a in agent_ids.split(",")]
+
+    kb_list = None
+    if kbs:
+        kb_list = [k.strip() for k in kbs.split(",")]
+
+    result = []
+
+    for agent_id in agent_ids:
+
+        if kb_list:
+            for kb in kb_list:
+                row = get_patch_progress_by_kb(agent_id, kb)
+                if row:
+                    result.append(row)
+
+        else:
+            rows = get_all_progress_by_agent(agent_id)
+            result.extend(rows)
+
+    return jsonify({
+        "agents": agent_ids,
+        "patches": result
+    })
 
 def get_memory_stats():
     process = psutil.Process(os.getpid())
@@ -440,24 +538,29 @@ def heartbeat():
 # FLAT ZIP (no extra folder)
 # =========================================================
 def zip_flat(path):
-    temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
-    zip_path = temp_zip.name
+
+    fd, zip_path = tempfile.mkstemp(suffix=".zip")
+    os.close(fd)   # Windows lock avoid karne ke liye close
+
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as z:
+
         if os.path.isfile(path):
             z.write(path, os.path.basename(path))
+
         else:
             for root, _, files in os.walk(path):
                 for f in files:
                     full = os.path.join(root, f)
                     arc = os.path.relpath(full, path)
                     z.write(full, arc)
-    return zip_path
 
+    return zip_path
 # =========================================================
 # WINDOW SCHEDULE PUSH
 # =========================================================
-@app.route("/api/schedule-push", methods=["POST"])
+@app.route("/api/window-schedule-push", methods=["POST"])
 def schedule_push():
+
     data = request.json
     agent_id = data.get("agent_id")
     folder = data.get("folder")
@@ -472,12 +575,15 @@ def schedule_push():
         pending_push[agent_id] = {"mode": "agent", "folder": None}
         log_push(agent_id, "scheduled", 0, "Full agent scheduled")
 
-    return jsonify({"status": "scheduled"})
+    return jsonify({
+        "status": "scheduled",
+        "agent_id": agent_id
+    })
 
 # =========================================================
 # WINDOW  GET UPDATE
 # =========================================================
-@app.route("/api/window-get-update")
+@app.route("/api/get-update")
 def get_update():
     agent_id = request.args.get("agent_id")
     job = pending_push.get(agent_id)
