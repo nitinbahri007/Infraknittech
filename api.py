@@ -766,51 +766,86 @@ def linux_missing_patches():
         print("API ERROR:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# ----------------------
+# UBuntu patch download
+# ----------------------
 
+# ==============================
+# DOWNLOAD FUNCTION
+# ==============================
 
-
+# ==============================
+# API DOWNLOAD PATCHES
+# ==============================
 @app.route("/api/ubuntu-download", methods=["POST"])
 def download_by_id():
+
     data = request.get_json()
-    ids = data.get("ids")  # can be single or list
+    ids = data.get("ids")
 
     if not ids:
         return jsonify({"error": "ids required"}), 400
 
-    # single → list
+    # single id ko list me convert
     if not isinstance(ids, list):
         ids = [ids]
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Fetch rows
     placeholders = ",".join(["%s"] * len(ids))
-    cursor.execute(f"""
-        SELECT id, ip_address, package_name, latest_version
+
+    query = f"""
+        SELECT id, ip_address, package_name, installed_version, latest_version, agent_id
         FROM linux_patches
         WHERE id IN ({placeholders})
-    """, ids)
+    """
 
+    cursor.execute(query, ids)
     rows = cursor.fetchall()
+
+    cursor.close()
     conn.close()
 
     if not rows:
         return jsonify({"error": "No patches found"}), 404
 
-    # Background download
+    packages = []
+
+    for row in rows:
+        patch_id, ip, pkg, installed_version, latest_version, agent_id = row
+
+        packages.append({
+            "id": patch_id,
+            "ip_address": ip,
+            "package_name": pkg,
+            "installed_version": installed_version,
+            "latest_version": latest_version,
+            "agent_id": agent_id
+        })
+
+    # background thread start
     thread = threading.Thread(
         target=download_by_rows,
         args=(rows, download_progress),
         daemon=True
     )
+
     thread.start()
 
     return jsonify({
         "status": "started",
         "total": len(rows),
-        "ids": ids
+        "packages": packages
     })
+
+# ==============================
+# DOWNLOAD PROGRESS API
+# ==============================
+@app.route("/api/download-progress")
+def get_progress():
+    return jsonify(download_progress)
+
 
 # ===============================
 # Ubuntu Download PROGRESS API

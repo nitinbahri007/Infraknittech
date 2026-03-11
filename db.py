@@ -7,9 +7,9 @@ def get_db_connection():
     Auto reconnect enabled for stability.
     """
     return mysql.connector.connect(
-        host="10.10.10.91",
+        host="10.10.8.23",
         user="root",
-        password="USn7ets2020#",
+        password="Usn7ets2020#",
         database="infra_monitor",
         autocommit=False,
         connection_timeout=5
