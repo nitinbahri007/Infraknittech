@@ -590,7 +590,7 @@ http://10.10.8.19:5000/api/window-progress-bar?agent_id=3ba1b11e-6393-4e22-956b-
 ```
 
 
-### Patch Status Definitions
+### Patch Status Definitions progress bar defination
 
 The following table describes patch lifecycle states returned by the Window Progress API.
 
@@ -606,6 +606,56 @@ The following table describes patch lifecycle states returned by the Window Prog
 
 ---
 ---
+
+# 📦 Deployment patches on specific nodes 
+**POST** `/api/window-schedule-push`
+
+## 1️⃣ POstman examples  
+
+POST /api/window-schedule-push
+### step 1 url 
+
+```
+http://10.10.8.19:5000/api/window-schedule-push
+```
+### step 2 header tab 
+
+```
+Content-Type: application/json
+```
+
+### step 3 body  single patch download 
+
+```
+{
+  "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+  "folder": "KB5031539"
+}
+
+```
+```json 
+{
+    "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+    "status": "scheduled"
+}
+
+```
+# 📦 Deployment patches updates
+
+**GET** `/api/get-update`
+
+### step 1 url with agent id 
+ 
+```
+http://10.10.8.19:5000/api/get-update?agent_id=3ba1b11e-6393-4e22-956b-1837aa5f3282
+``` 
+
+```json 
+{
+    "status": "no_update"
+}
+```
+
 
 ## ✅ Common Usage
 
