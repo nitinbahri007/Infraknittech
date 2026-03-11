@@ -401,14 +401,72 @@ Content-Type: application/json
 ### base url 
 
 ```
-http://10.10.8.19:5000/api/ubuntu-progress-bar
+http://10.10.8.19:5000/api/ubuntu-download-progress
+```
+
+```json 
+{
+    "done": 1,
+    "items": {},
+    "percent": 100.0,
+    "status": "completed",
+    "total": 1
+}
 ```
 
 ###  1 single agent progress 
 
 ```
-http://10.10.8.19:5000/api/ubuntu-progress-bar?agent_id=c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef
+http://10.10.8.19:5000/api/ubuntu-download-progress?agent_id=c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef
 ```
 
+```json 
+
+{
+    "done": 1,
+    "items": {},
+    "percent": 100.0,
+    "status": "completed",
+    "total": 1
+}
+
+````
+
+# 📦 deployment of ubuntu patch on particular node 
+
+**POST** `/api/ubuntu-patch-schedule`
+
+## 1️⃣ POstman examples  
+
+POST /api/ubuntu-patch-schedule
+### step 1 url 
+
+```
+http://10.10.8.19:5000/api/ubuntu-patch-schedule
+```
+
+### step 2 header tab 
+
+```
+Content-Type: application/json
+```
+
+### step 3 body  single patch download 
+
+```
+{
+  "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+  "patch_file": "apt_2.4.14.deb"
+}
+```
+
+```json 
+{
+    "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+    "status": "scheduled"
+    "patch_file":"apt_2.4.14.deb"
+}
+
+```
 
 

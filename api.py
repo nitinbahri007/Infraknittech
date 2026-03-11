@@ -834,11 +834,53 @@ def progress():
 # ===============================
 # Ubuntu push Schedule API
 # ===============================
+@app.route("/api/ubuntu-patch-schedule", methods=["POST"])
+def ubuntu_patch_schedule():
+
+    data = request.json
+    agent_id = data.get("agent_id")
+    patch_file = data.get("patch_file")
+
+    if not agent_id:
+        return jsonify({"error": "agent_id required"}), 400
+
+    if not patch_file:
+        return jsonify({"error": "patch_file required"}), 400
+
+    pending_ubuntu_patch[agent_id] = {
+        "patch_file": patch_file
+    }
+
+    log_push(agent_id, "scheduled", 0, f"Ubuntu patch scheduled: {patch_file}")
+
+    return jsonify({
+        "status": "scheduled",
+        "agent_id": agent_id,
+        "patch_file": patch_file
+    })
 
 # ===============================
 # Ubuntu push PROGRESS API
 # ===============================
+@app.route("/api/linux-patch-check", methods=["POST"])
+def linux_patch_check():
 
+    data = request.get_json(force=True)
+    agent_id = data.get("agent_id")
+
+    if not agent_id:
+        return jsonify({"error": "agent_id required"}), 400
+
+    if agent_id in pending_ubuntu_patch:
+
+        patch = pending_ubuntu_patch.pop(agent_id)
+
+        return jsonify({
+            "action": "install_patch",
+            "patch_file": patch["patch_file"]
+        })
+
+    return jsonify({"action": "none"})
 
 
 
