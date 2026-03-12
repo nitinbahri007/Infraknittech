@@ -561,25 +561,73 @@ def zip_flat(path):
 @app.route("/api/window-schedule-push", methods=["POST"])
 def schedule_push():
 
-    data = request.json
-    agent_id = data.get("agent_id")
+    data = request.get_json(silent=True)
+
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    agent_id = str(data.get("agent_id", "")).strip()
     folder = data.get("folder")
 
     if not agent_id:
         return jsonify({"error": "agent_id required"}), 400
 
+    # DB connection
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute(
+            "SELECT status FROM devices WHERE TRIM(agent_id)=%s",
+            (agent_id,)
+        )
+        device = cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
+
+    if not device:
+        return jsonify({
+            "error": "agent not found",
+            "agent_id": agent_id
+        }), 404
+
+    # Normalize status
+    status = str(device.get("status", "")).strip().lower()
+
+    print("Agent ID:", agent_id)
+    print("DB Status:", device.get("status"))
+    print("Normalized Status:", status)
+
+    # If agent offline
+    if status != "online":
+        return jsonify({
+            "status": "could not process if agent is offline",
+            "agent_id": agent_id,
+            "agent_status": status
+        }), 200
+
+    # Schedule push
     if folder:
-        pending_push[agent_id] = {"mode": "folder", "folder": folder}
+        pending_push[agent_id] = {
+            "mode": "folder",
+            "folder": folder
+        }
         log_push(agent_id, "scheduled", 0, f"Folder scheduled: {folder}")
     else:
-        pending_push[agent_id] = {"mode": "agent", "folder": None}
+        pending_push[agent_id] = {
+            "mode": "agent",
+            "folder": None
+        }
         log_push(agent_id, "scheduled", 0, "Full agent scheduled")
 
     return jsonify({
         "status": "scheduled",
-        "agent_id": agent_id
-    })
-
+        "agent_id": agent_id,
+        "agent_status": status,
+        "mode": pending_push[agent_id]["mode"],
+        "folder": pending_push[agent_id]["folder"]
+    }), 200
 # =========================================================
 # WINDOW  GET UPDATE
 # =========================================================
@@ -847,6 +895,26 @@ def ubuntu_patch_schedule():
     if not patch_file:
         return jsonify({"error": "patch_file required"}), 400
 
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("SELECT status FROM devices WHERE agent_id = %s", (agent_id,))
+    device = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    if not device:
+        return jsonify({"error": "agent not found"}), 404
+
+    # check agent status
+    if device["status"] != "online":
+        return jsonify({
+            "status": "could not process if agent is offline",
+            "agent_id": agent_id
+        }), 400
+
+    # schedule patch
     pending_ubuntu_patch[agent_id] = {
         "patch_file": patch_file
     }
@@ -858,7 +926,6 @@ def ubuntu_patch_schedule():
         "agent_id": agent_id,
         "patch_file": patch_file
     })
-
 # ===============================
 # Ubuntu push PROGRESS API
 # ===============================
