@@ -602,7 +602,6 @@ def schedule_push():
     # If agent offline
     if status != "online":
         return jsonify({
-            "status": "could not process if agent is offline",
             "agent_id": agent_id,
             "agent_status": status
         }), 200
