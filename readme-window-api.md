@@ -642,17 +642,21 @@ Content-Type: application/json
 ```
 # 📦 Deployment patches updates
 
-**GET** `/api/get-update`
+**GET** `api/window-push-status`
 
 ### step 1 url with agent id 
  
 ```
-http://10.10.8.19:5000/api/get-update?agent_id=3ba1b11e-6393-4e22-956b-1837aa5f3282
+http://10.10.8.19:5000/api/window-push-status?agent_id=3ba1b11e-6393-4e22-956b-1837aa5f3282
 ``` 
 
 ```json 
 {
-    "status": "no_update"
+    "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+    "message": "Push complete",
+    "progress": 100,
+    "status": "completed",
+    "updated_at": "Thu, 12 Mar 2026 11:44:20 GMT"
 }
 ```
 
