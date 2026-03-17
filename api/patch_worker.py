@@ -72,6 +72,7 @@ def download_file(agent_id, msu_url, file_path, kb, title):
         update_patch_progress(agent_id, title, kb, 100, "DOWNLOADED")
 
         # install queue ready
+        update_patch_install_progress(agent_id, kb, 0, "READY_TO_INSTALL")
 
         insert_patch_alert(agent_id, kb, f"{kb} download completed", "DOWNLOAD")
 
@@ -172,7 +173,7 @@ def process_patch(agent_id, patch_title):
         # already downloaded
         if os.path.exists(file_path):
             update_patch_progress(agent_id, patch_title, kb_id, 100, "DOWNLOADED")
-            update_patch_install_progress(agent_id, kb_id, 100, "READY_TO_INSTALL")
+            update_patch_install_progress(agent_id, kb_id, 0, "READY_TO_INSTALL")
             return
 
         download_file(agent_id, msu_url, file_path, kb_id, patch_title)

@@ -1,0 +1,472 @@
+{
+  "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef": {
+    "total_installed": 1843,
+    "missing_count": 77,
+    "outdated_ubuntu": 62,
+    "external_packages": 15,
+    "missing_preview": [
+      {
+        "package": "apt",
+        "installed": "2.4.9",
+        "latest": "2.4.14",
+        "type": "outdated"
+      },
+      {
+        "package": "apt-transport-https",
+        "installed": "2.4.13",
+        "latest": "2.4.14",
+        "type": "outdated"
+      },
+      {
+        "package": "apt-utils",
+        "installed": "2.4.9",
+        "latest": "2.4.14",
+        "type": "outdated"
+      },
+      {
+        "package": "base-files",
+        "installed": "12ubuntu4.4",
+        "latest": "12ubuntu4.7",
+        "type": "outdated"
+      },
+      {
+        "package": "default-jre-headless",
+        "installed": "2:1.11-72build2",
+        "latest": "2",
+        "type": "meta_package"
+      },
+      {
+        "package": "distro-info",
+        "installed": "1.1ubuntu0.1",
+        "latest": "1.1ubuntu0.2",
+        "type": "outdated"
+      },
+      {
+        "package": "dmeventd",
+        "installed": "2:1.02.175-2.1ubuntu4",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "dmsetup",
+        "installed": "2:1.02.175-2.1ubuntu4",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "dns-root-data",
+        "installed": "2023112702~ubuntu0.22.04.1",
+        "latest": "2024071801~ubuntu0.22.04.1",
+        "type": "outdated"
+      },
+      {
+        "package": "imagemagick",
+        "installed": "8:6.9.11.60+dfsg-1.3ubuntu0.22.04.5",
+        "latest": "8",
+        "type": "outdated"
+      },
+      {
+        "package": "imagemagick-6-common",
+        "installed": "8:6.9.11.60+dfsg-1.3ubuntu0.22.04.5",
+        "latest": "8",
+        "type": "outdated"
+      },
+      {
+        "package": "imagemagick-6.q16",
+        "installed": "8:6.9.11.60+dfsg-1.3ubuntu0.22.04.5",
+        "latest": "8",
+        "type": "outdated"
+      },
+      {
+        "package": "initramfs-tools",
+        "installed": "0.140ubuntu13.2",
+        "latest": "0.140ubuntu13.5",
+        "type": "outdated"
+      },
+      {
+        "package": "initramfs-tools-bin",
+        "installed": "0.140ubuntu13.2",
+        "latest": "0.140ubuntu13.5",
+        "type": "outdated"
+      },
+      {
+        "package": "initramfs-tools-core",
+        "installed": "0.140ubuntu13.2",
+        "latest": "0.140ubuntu13.5",
+        "type": "outdated"
+      },
+      {
+        "package": "landscape-common",
+        "installed": "19.12-0ubuntu13",
+        "latest": "23.02-0ubuntu1~22.04.7",
+        "type": "outdated"
+      },
+      {
+        "package": "libapt-pkg6.0",
+        "installed": "2.4.9",
+        "latest": "2.4.14",
+        "type": "outdated"
+      },
+      {
+        "package": "libbpf0",
+        "installed": "1:0.5.0-1ubuntu22.04.1",
+        "latest": "1",
+        "type": "outdated"
+      },
+      {
+        "package": "libdevmapper-event1.02.1",
+        "installed": "2:1.02.175-2.1ubuntu4",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libdevmapper1.02.1",
+        "installed": "2:1.02.175-2.1ubuntu4",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libhtp2",
+        "installed": "1:0.5.39-1",
+        "latest": "1",
+        "type": "outdated"
+      },
+      {
+        "package": "libice-dev",
+        "installed": "2:1.0.10-1build2",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libice6",
+        "installed": "2:1.0.10-1build2",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libmagickcore-6.q16-6",
+        "installed": "8:6.9.11.60+dfsg-1.3ubuntu0.22.04.5",
+        "latest": "8",
+        "type": "outdated"
+      },
+      {
+        "package": "libmagickcore-6.q16-6-extra",
+        "installed": "8:6.9.11.60+dfsg-1.3ubuntu0.22.04.5",
+        "latest": "8",
+        "type": "outdated"
+      },
+      {
+        "package": "libmagickwand-6.q16-6",
+        "installed": "8:6.9.11.60+dfsg-1.3ubuntu0.22.04.5",
+        "latest": "8",
+        "type": "outdated"
+      },
+      {
+        "package": "liborc-0.4-0",
+        "installed": "1:0.4.32-2ubuntu0.1",
+        "latest": "1",
+        "type": "outdated"
+      },
+      {
+        "package": "libredis-perl",
+        "installed": "2:1.9990-1",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libsm-dev",
+        "installed": "2:1.2.3-1build2",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libsm6",
+        "installed": "2:1.2.3-1build2",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libusb-1.0-0",
+        "installed": "2:1.0.25-1ubuntu2",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libx11-6",
+        "installed": "2:1.7.5-1ubuntu0.3",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libx11-data",
+        "installed": "2:1.7.5-1ubuntu0.3",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libx11-dev",
+        "installed": "2:1.7.5-1ubuntu0.3",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libx11-xcb1",
+        "installed": "2:1.7.5-1ubuntu0.3",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libxaw7",
+        "installed": "2:1.0.14-1",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libxcomposite1",
+        "installed": "1:0.4.5-1build2",
+        "latest": "1",
+        "type": "outdated"
+      },
+      {
+        "package": "libxext-dev",
+        "installed": "2:1.3.4-1build1",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libxext6",
+        "installed": "2:1.3.4-1build1",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libxi6",
+        "installed": "2:1.8-1build1",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libxinerama1",
+        "installed": "2:1.1.4-3",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libxmu6",
+        "installed": "2:1.1.3-3",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libxmuu1",
+        "installed": "2:1.1.3-3",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libxrandr2",
+        "installed": "2:1.5.2-1build1",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libxrender-dev",
+        "installed": "1:0.9.10-1build4",
+        "latest": "1",
+        "type": "outdated"
+      },
+      {
+        "package": "libxrender1",
+        "installed": "1:0.9.10-1build4",
+        "latest": "1",
+        "type": "outdated"
+      },
+      {
+        "package": "libxtst6",
+        "installed": "2:1.2.3-1build4",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libxv1",
+        "installed": "2:1.0.11-1build2",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "libxxf86dga1",
+        "installed": "2:1.1.5-0ubuntu3",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "linux-base",
+        "installed": "4.5ubuntu9",
+        "latest": "4.5ubuntu9+22.04.1",
+        "type": "outdated"
+      },
+      {
+        "package": "motd-news-config",
+        "installed": "12ubuntu4.4",
+        "latest": "12ubuntu4.7",
+        "type": "outdated"
+      },
+      {
+        "package": "python3-distro-info",
+        "installed": "1.1ubuntu0.1",
+        "latest": "1.1ubuntu0.2",
+        "type": "outdated"
+      },
+      {
+        "package": "python3-magic",
+        "installed": "2:0.4.24-2",
+        "latest": "2",
+        "type": "outdated"
+      },
+      {
+        "package": "python3-software-properties",
+        "installed": "0.99.22.7",
+        "latest": "0.99.22.9",
+        "type": "outdated"
+      },
+      {
+        "package": "software-properties-common",
+        "installed": "0.99.22.7",
+        "latest": "0.99.22.9",
+        "type": "outdated"
+      },
+      {
+        "package": "systemd-hwe-hwdb",
+        "installed": "249.11.3",
+        "latest": "249.11.6",
+        "type": "outdated"
+      },
+      {
+        "package": "ubuntu-advantage-tools",
+        "installed": "28.1~22.04",
+        "latest": "37.1ubuntu0~22.04",
+        "type": "outdated"
+      },
+      {
+        "package": "ubuntu-drivers-common",
+        "installed": "1:0.9.6.2~0.22.04.8",
+        "latest": "1",
+        "type": "outdated"
+      },
+      {
+        "package": "ubuntu-minimal",
+        "installed": "1.481.1",
+        "latest": "1.481.5",
+        "type": "outdated"
+      },
+      {
+        "package": "ubuntu-server",
+        "installed": "1.481.1",
+        "latest": "1.481.5",
+        "type": "outdated"
+      },
+      {
+        "package": "ubuntu-standard",
+        "installed": "1.481.1",
+        "latest": "1.481.5",
+        "type": "outdated"
+      },
+      {
+        "package": "update-notifier-common",
+        "installed": "3.192.54.6",
+        "latest": "3.192.54.8",
+        "type": "outdated"
+      },
+      {
+        "package": "apt-ntop",
+        "installed": "2.10-26",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "mongodb-database-tools",
+        "installed": "100.10.0",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "mongodb-mongosh",
+        "installed": "2.3.3",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "mongodb-org",
+        "installed": "6.0.19",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "mongodb-org-database",
+        "installed": "6.0.19",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "mongodb-org-database-tools-extra",
+        "installed": "6.0.19",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "mongodb-org-mongos",
+        "installed": "6.0.19",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "mongodb-org-server",
+        "installed": "6.0.19",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "mongodb-org-shell",
+        "installed": "6.0.19",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "mongodb-org-tools",
+        "installed": "6.0.19",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "ndpi",
+        "installed": "4.9.0-4465",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "nprobe",
+        "installed": "10.5.231114-8175",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "ntop-license",
+        "installed": "1.0",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "pfring",
+        "installed": "8.7.0-8665",
+        "latest": "external_repo",
+        "type": "external_repo"
+      },
+      {
+        "package": "pfring-dkms",
+        "installed": "8.7.0.8665",
+        "latest": "external_repo",
+        "type": "external_repo"
+      }
+    ]
+  }
+}

@@ -20,19 +20,15 @@ def download_by_rows(rows, progress):
     progress["total"] = total
     progress["done"] = 0
     progress["status"] = "downloading"
-    progress["items"] = {}
-
-    # initialize
-    for row in rows:
-        progress["items"][row[0]] = "pending"
 
     for row in rows:
         patch_id, ip, pkg, version = row
         status = "failed"
+        filepath = ""
 
         try:
             filename = f"{pkg}_{version}.deb".replace(":", "%3a")
-            filepath = os.path.join("linux_patches", filename)
+            filepath = os.path.join(DOWNLOAD_DIR, filename)
 
             if os.path.exists(filepath):
                 status = "exists"
@@ -43,13 +39,21 @@ def download_by_rows(rows, progress):
                 if r.status_code == 200:
                     with open(filepath, "wb") as f:
                         f.write(r.content)
-                    status = "completed"
+                    status = "downloaded"
 
         except Exception as e:
             print("Error:", pkg, e)
 
-        # 🔥 per-ID update
-        progress["items"][patch_id] = status
+        # ✅ SAVE DOWNLOAD LOG
+        cursor.execute("""
+            INSERT INTO patch_download_log
+            (patch_id, ip_address, package_name, version, file_path, status)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (patch_id, ip, pkg, version, filepath, status))
+
+        conn.commit()
         progress["done"] += 1
 
+    cursor.close()
+    conn.close()
     progress["status"] = "completed"

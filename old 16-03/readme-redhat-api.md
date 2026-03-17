@@ -223,50 +223,7 @@ http://10.10.8.19:5000/api/devices?status=ONLINE
   ]
 }
 ```
+## 3️⃣ Bulk Devices ip address wise 
 
-# 📦 Redhat missing patch listing 
 
-**GET** `/api/redhat-patches-missing`
-
-## 1️⃣ Get All  redhat Missing Patches for single agent
-```
-http://10.10.8.19:5001/api/redhat-patches-missing?agent_id=082b88df-5f84-472d-abac-e5ebb5be3998
-
-```
-```json
-{
-    "agent_ids": [
-        "082b88df-5f84-472d-abac-e5ebb5be3998"
-    ],
-    "count": 3,
-    "data": [
-        {
-            "agent_id": "082b88df-5f84-472d-abac-e5ebb5be3998",
-            "created_at": "Tue, 17 Feb 2026 06:13:42 GMT",
-            "id": 256,
-            "ip_address": "10.10.8.215",
-            "package_name": "libstdc++.x86_64",
-            "repo": "rhel-10-for-x86_64-baseos-rpms",
-            "version": "14.3.1-2.1.el10"
-        },
-        {
-            "agent_id": "082b88df-5f84-472d-abac-e5ebb5be3998",
-            "created_at": "Tue, 17 Feb 2026 06:13:42 GMT",
-            "id": 1,
-            "ip_address": "10.10.8.215",
-            "package_name": "Not",
-            "repo": "Subscription",
-            "version": "root,"
-        },
-        {
-            "agent_id": "082b88df-5f84-472d-abac-e5ebb5be3998",
-            "created_at": "Tue, 17 Feb 2026 06:13:42 GMT",
-            "id": 257,
-            "ip_address": "10.10.8.215",
-            "package_name": "libsysfs.x86_64",
-            "repo": "rhel-10-for-x86_64-baseos-rpms",
-            "version": "2.1.1-15.el10"
-        }
-      ]
-}
-```
+---

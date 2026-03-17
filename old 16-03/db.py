@@ -1,99 +1,19 @@
 import mysql.connector
-from datetime import datetime
 
 
-# 🔌 Database Connection
 def get_db_connection():
+    """
+    Create and return a new database connection.
+    Auto reconnect enabled for stability.
+    """
     return mysql.connector.connect(
         host="10.10.10.91",
         user="root",
         password="xxxx",
         database="infra_monitor",
+        autocommit=False,
         connection_timeout=5
     )
-
-
-# 📋 Get all expected agents from devices table
-def get_all_devices():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT agent_id FROM devices")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return [r[0] for r in rows]
-
-
-# 🟢🔴 Update device ONLINE/OFFLINE status
-def update_device_status(agent_id, status):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE devices
-        SET status=%s, updated_at=NOW()
-        WHERE agent_id=%s
-    """, (status, agent_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-
-# ⬇️ Start outage when agent goes offline
-def start_outage(hostname):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Insert only if no open outage exists
-        cursor.execute("""
-            SELECT id FROM agent_outages
-            WHERE hostname=%s AND down_end IS NULL
-            LIMIT 1
-        """, (hostname,))
-        existing = cursor.fetchone()
-
-        if not existing:
-            cursor.execute(
-                "INSERT INTO agent_outages (hostname, down_start) VALUES (%s, %s)",
-                (hostname, datetime.now())
-            )
-            conn.commit()
-
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print("DB Error (start_outage):", e)
-
-
-# ⬆️ End outage when agent comes back online
-def end_outage(hostname):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            SELECT id, down_start FROM agent_outages
-            WHERE hostname=%s AND down_end IS NULL
-            ORDER BY down_start DESC LIMIT 1
-        """, (hostname,))
-        row = cursor.fetchone()
-
-        if row:
-            outage_id, start_time = row
-            end_time = datetime.now()
-            duration = int((end_time - start_time).total_seconds())
-
-            cursor.execute("""
-                UPDATE agent_outages
-                SET down_end=%s, duration_seconds=%s
-                WHERE id=%s
-            """, (end_time, duration, outage_id))
-            conn.commit()
-
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print("DB Error (end_outage):", e)
 
 # ================= FETCH PATCHES =================
 def get_patches_by_ip():
@@ -236,4 +156,3 @@ def get_all_progress_by_agent(agent_id):
     except Exception as e:
         print("Agent progress error:", e)
         return []
-

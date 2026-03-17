@@ -1,4 +1,4 @@
-# Redhat API DOCUMENTATION 
+# UBUNTU API DOCUMENTATION 
 ------------------------------------------------------------------------------
 # 🖥 Devices API 
 
@@ -223,50 +223,250 @@ http://10.10.8.19:5000/api/devices?status=ONLINE
   ]
 }
 ```
+## 3️⃣ Bulk Devices ip address wise 
 
-# 📦 Redhat missing patch listing 
 
-**GET** `/api/redhat-patches-missing`
+---
+# 📦 ubuntu missing patch listing
 
-## 1️⃣ Get All  redhat Missing Patches for single agent
+
+**GET** `api/linux-missing-patches`
+
+## 1️⃣ Get All  Window Missing Patches
 ```
-http://10.10.8.19:5001/api/redhat-patches-missing?agent_id=082b88df-5f84-472d-abac-e5ebb5be3998
+http://10.10.8.19:5000/api/linux-missing-patches
 
 ```
-```json
+```json 
+
 {
-    "agent_ids": [
-        "082b88df-5f84-472d-abac-e5ebb5be3998"
-    ],
-    "count": 3,
-    "data": [
-        {
-            "agent_id": "082b88df-5f84-472d-abac-e5ebb5be3998",
-            "created_at": "Tue, 17 Feb 2026 06:13:42 GMT",
-            "id": 256,
-            "ip_address": "10.10.8.215",
-            "package_name": "libstdc++.x86_64",
-            "repo": "rhel-10-for-x86_64-baseos-rpms",
-            "version": "14.3.1-2.1.el10"
-        },
-        {
-            "agent_id": "082b88df-5f84-472d-abac-e5ebb5be3998",
-            "created_at": "Tue, 17 Feb 2026 06:13:42 GMT",
-            "id": 1,
-            "ip_address": "10.10.8.215",
-            "package_name": "Not",
-            "repo": "Subscription",
-            "version": "root,"
-        },
-        {
-            "agent_id": "082b88df-5f84-472d-abac-e5ebb5be3998",
-            "created_at": "Tue, 17 Feb 2026 06:13:42 GMT",
-            "id": 257,
-            "ip_address": "10.10.8.215",
-            "package_name": "libsysfs.x86_64",
-            "repo": "rhel-10-for-x86_64-baseos-rpms",
-            "version": "2.1.1-15.el10"
-        }
-      ]
+count: 3,
+data: [
+{
+agent_id: "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+hostname: "EMS-Server",
+id: 20,
+installed_version: "2.4.9",
+ip_address: "10.10.10.91",
+latest_version: "2.4.14",
+package_name: "apt",
+patch_type: "outdated",
+scan_time: "Tue, 24 Feb 2026 17:57:09 GMT"
+},
+{},
+{
+agent_id: "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+hostname: "EMS-Server",
+id: 22,
+installed_version: "2.4.13",
+ip_address: "10.10.10.91",
+latest_version: "2.4.14",
+package_name: "apt-transport-https",
+patch_type: "outdated",
+scan_time: "Tue, 24 Feb 2026 17:57:09 GMT"
+},
+{
+agent_id: "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+hostname: "EMS-Server",
+id: 23,
+installed_version: "2.4.9",
+ip_address: "10.10.10.91",
+latest_version: "2.4.14",
+package_name: "apt-utils",
+patch_type: "outdated",
+scan_time: "Tue, 24 Feb 2026 17:57:09 GMT"
+}
+]
+}
+
+```
+
+## 2 Get Missing patch by agent id 
+
+```
+http://10.10.8.19:5000/api/linux-missing-patches?agent_id="c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef"
+
+```
+
+```json 
+{
+count: 3,
+data: [
+{
+agent_id: "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+hostname: "EMS-Server",
+id: 20,
+installed_version: "2.4.9",
+ip_address: "10.10.10.91",
+latest_version: "2.4.14",
+package_name: "apt",
+patch_type: "outdated",
+scan_time: "Tue, 24 Feb 2026 17:57:09 GMT"
+},
+{},
+{
+agent_id: "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+hostname: "EMS-Server",
+id: 22,
+installed_version: "2.4.13",
+ip_address: "10.10.10.91",
+latest_version: "2.4.14",
+package_name: "apt-transport-https",
+patch_type: "outdated",
+scan_time: "Tue, 24 Feb 2026 17:57:09 GMT"
+},
+{
+agent_id: "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+hostname: "EMS-Server",
+id: 23,
+installed_version: "2.4.9",
+ip_address: "10.10.10.91",
+latest_version: "2.4.14",
+package_name: "apt-utils",
+patch_type: "outdated",
+scan_time: "Tue, 24 Feb 2026 17:57:09 GMT"
+}
+]
 }
 ```
+
+# 📦 DOwnload missing patch listing Ubuntu
+
+*POST** `/api/ubuntu-download`
+
+## 1️⃣ POstman examples 
+
+POST /api/ubuntu-download
+
+### step 1 url 
+
+```
+http://10.10.8.19:5000/api/ubuntu-download
+```
+### step 2 header tab 
+
+```
+Content-Type: application/json
+```
+
+### step 3 body  single patch download 
+
+```
+{
+  "id": "22",
+  "agent_id": "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef"
+}
+
+```
+
+```json
+{
+  "status": "accepted",
+  "jobs": 1
+}
+
+```
+
+### step 4 body with multiple patch download 
+
+```
+[
+  {
+    "id": "23",
+    "agent_id": "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef"
+  },
+  {
+    "id": "24",
+    "agent_id": "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef"
+  }
+]
+```
+
+
+
+```json
+{
+  "status": "accepted",
+  "jobs": 2
+}
+
+```
+
+# 📦 Status of file downloading or not 
+
+**GET** `/api/ubuntu-progress-bar`
+
+## 1️⃣ POstman examples 
+
+### base url 
+
+```
+http://10.10.8.19:5000/api/ubuntu-download-progress
+```
+
+```json 
+{
+    "done": 1,
+    "items": {},
+    "percent": 100.0,
+    "status": "completed",
+    "total": 1
+}
+```
+
+###  1 single agent progress 
+
+```
+http://10.10.8.19:5000/api/ubuntu-download-progress?agent_id=c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef
+```
+
+```json 
+
+{
+    "done": 1,
+    "items": {},
+    "percent": 100.0,
+    "status": "completed",
+    "total": 1
+}
+
+````
+
+# 📦 deployment of ubuntu patch on particular node 
+
+**POST** `/api/ubuntu-patch-schedule`
+
+## 1️⃣ POstman examples  
+
+POST /api/ubuntu-patch-schedule
+### step 1 url 
+
+```
+http://10.10.8.19:5000/api/ubuntu-patch-schedule
+```
+
+### step 2 header tab 
+
+```
+Content-Type: application/json
+```
+
+### step 3 body  single patch download 
+
+```
+{
+  "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+  "patch_file": "apt_2.4.14.deb"
+}
+```
+
+```json 
+{
+    "agent_id": "3ba1b11e-6393-4e22-956b-1837aa5f3282",
+    "status": "scheduled"
+    "patch_file":"apt_2.4.14.deb"
+}
+
+```
+
+

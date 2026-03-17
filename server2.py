@@ -10,89 +10,105 @@ from db import (
 import threading
 import time
 import traceback
+import socket
+import platform
+import os
+from api import api_bp
 
 app = Flask(__name__)
 
+app.register_blueprint(api_bp)
+
+
 # ================= CONFIG =================
-HEARTBEAT_TIMEOUT = 5  # seconds
-last_heartbeat = {}    # agent_id -> datetime
-device_status = {}     # agent_id -> ONLINE/OFFLINE
-expected_agents = []   # from DB
+HEARTBEAT_TIMEOUT = 40
+last_heartbeat = {}
+device_status = {}
+expected_agents = []
 
 
-# ================= HEARTBEAT RECEIVER =================
+# ================= HEARTBEAT NEW  =================
 @app.route("/api/heartbeat", methods=["POST"])
 def heartbeat():
+
+    print("🔥 HEARTBEAT API CALLED")
+
     data = request.json or {}
     agent_id = data.get("agent_id")
 
     if not agent_id:
+        print("❌ agent_id missing")
         return jsonify({"error": "agent_id missing"}), 400
 
-    hostname = data.get("hostname")
-    ip_address = data.get("ip_address")
-    os_name = data.get("os")
-    agent_version = data.get("agent_version")
+    hostname = data.get("hostname") or socket.gethostname()
+    ip_address = data.get("ip_address") or request.remote_addr
+    os_name = data.get("os") or platform.system()
+    os_version = data.get("os_version") or platform.version()
+    os_architecture = data.get("os_arch") or platform.machine()
+    agent_version = data.get("agent_version") or "1.0"
 
     now = datetime.now()
+
+    print("📡 Heartbeat received")
+    print("Agent ID:", agent_id)
+    print("Hostname:", hostname)
+    print("IP:", ip_address)
+    print("OS:", os_name, os_version)
+    print("Agent Version:", agent_version)
+
     last_heartbeat[agent_id] = now
 
     try:
+
         conn = get_db_connection()
         cursor = conn.cursor()
 
+        print("💾 Updating DB...")
+
         cursor.execute("""
-            INSERT INTO devices (
-                agent_id, hostname, ip_address, os_name,
-                agent_version, last_heartbeat, status, updated_at
-            )
-            VALUES (%s,%s,%s,%s,%s,NOW(),'ONLINE',NOW())
-            ON DUPLICATE KEY UPDATE
-                hostname=%s,
-                ip_address=%s,
-                os_name=%s,
-                agent_version=%s,
-                last_heartbeat=NOW(),
-                status='ONLINE',
-                updated_at=NOW()
+        INSERT INTO devices (
+            agent_id, hostname, ip_address, os_name,
+            os_version, os_architecture,
+            agent_version, last_heartbeat, status, updated_at
+        )
+        VALUES (%s,%s,%s,%s,%s,%s,%s,NOW(),'ONLINE',NOW())
+        ON DUPLICATE KEY UPDATE
+            hostname=VALUES(hostname),
+            ip_address=VALUES(ip_address),
+            os_name=VALUES(os_name),
+            os_version=VALUES(os_version),
+            os_architecture=VALUES(os_architecture),
+            agent_version=VALUES(agent_version),
+            last_heartbeat=NOW(),
+            status='ONLINE',
+            updated_at=NOW()
         """, (
-            agent_id, hostname, ip_address, os_name, agent_version,
-            hostname, ip_address, os_name, agent_version
+            agent_id,
+            hostname,
+            ip_address,
+            os_name,
+            os_version,
+            os_architecture,
+            agent_version
         ))
 
         conn.commit()
+
+        print("✅ DB updated")
+        print("Rows affected:", cursor.rowcount)
+
         cursor.close()
         conn.close()
 
-        # OFFLINE → ONLINE recovery
-        if device_status.get(agent_id) != "ONLINE":
-            print(f"[{now.strftime('%H:%M:%S')}] 🟢 {agent_id} BACK ONLINE")
-            update_device_status(agent_id, "ONLINE")
-            end_outage(agent_id)
-
         device_status[agent_id] = "ONLINE"
 
-        print(f"[{now.strftime('%H:%M:%S')}] ❤️ Heartbeat from {agent_id}")
+        print(f"[{now.strftime('%H:%M:%S')}] ❤️ {agent_id} ONLINE")
 
-    except Exception:
-        print("❌ Heartbeat error:")
+    except Exception as e:
+        print("❌ DB ERROR:", e)
         traceback.print_exc()
 
-    return jsonify({"status": "alive"}), 200
-
-
-# ================= PATCH ALERT =================
-@app.route("/api/patch-alert", methods=["POST"])
-def patch_alert():
-    print("🚨 Patch alert:", request.json)
-    return jsonify({"status": "alert received"})
-
-
-@app.route("/api/repeat-patch-alert", methods=["POST"])
-def repeat_patch_alert():
-    print("🔁 Repeat patch alert:", request.json)
-    return jsonify({"status": "repeat alert received"})
-
+    return jsonify({"status": "alive", "test": "nitin"}), 200
 
 # ================= PATCH REPORT =================
 @app.route("/api/report", methods=["POST"])
@@ -174,20 +190,30 @@ def process_report_background(data):
         print("❌ Report processing error:")
         traceback.print_exc()
 
-
-# ================= DEVICE LIST REFRESH =================
+# ================= DEVICE REFRESH =================
 def refresh_devices():
     global expected_agents
     while True:
         try:
-            expected_agents = get_all_devices()
+            agents = get_all_devices()
+            expected_agents = agents
+
+            # Init device status map
+            for a in agents:
+                device_status.setdefault(a, "ONLINE")
+
+            print("🔄 Agents:", expected_agents)
+
         except Exception as e:
-            print("❌ Device refresh error:", e)
+            print("Refresh error:", e)
+
         time.sleep(30)
 
 
-# ================= HEARTBEAT MONITOR =================
+# ================= OFFLINE MONITOR =================
 def monitor_agents():
+    print("🛡 Offline monitor running")
+
     while True:
         now = datetime.now()
 
@@ -197,9 +223,13 @@ def monitor_agents():
             if not last or (now - last).total_seconds() > HEARTBEAT_TIMEOUT:
                 if device_status.get(agent_id) != "OFFLINE":
                     print(f"[{now.strftime('%H:%M:%S')}] 🔴 {agent_id} OFFLINE")
-                    update_device_status(agent_id, "OFFLINE")
-                    start_outage(agent_id)
-                    device_status[agent_id] = "OFFLINE"
+
+                    try:
+                        update_device_status(agent_id, "OFFLINE")
+                        start_outage(agent_id)
+                        device_status[agent_id] = "OFFLINE"
+                    except Exception as e:
+                        print("Offline error:", e)
 
         time.sleep(2)
 
@@ -218,14 +248,30 @@ def dashboard():
 
 @app.route("/")
 def home():
-    return "Infra Patch Monitoring Server Running 🚀"
+    return "Infra Monitoring Server Running 🚀"
 
 
-# ================= START SERVER =================
+UPLOAD_DIR = "uploads"
+
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@app.route("/api/upload-packages", methods=["POST"])
+def upload_packages():
+    if "file" not in request.files:
+        return jsonify({"error": "No file"}), 400
+
+    file = request.files["file"]
+    agent_id = request.form.get("agent_id", "unknown")
+
+    filename = f"{agent_id}_packages.txt"
+    path = os.path.join(UPLOAD_DIR, filename)
+    file.save(path)
+
+# ================= START =================
 if __name__ == "__main__":
-    print("🚀 Infra Patch Monitoring Server Started")
+    print("🚀 Server Started")
 
     threading.Thread(target=refresh_devices, daemon=True).start()
     threading.Thread(target=monitor_agents, daemon=True).start()
 
-    app.run(host="0.0.0.0", port=5001, threaded=True)
+    app.run(host="0.0.0.0", port=5000, threaded=True)

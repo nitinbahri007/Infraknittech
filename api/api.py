@@ -1,10 +1,9 @@
-from flask import Flask, Blueprint, request, jsonify, send_file, after_this_request
+from flask import Flask, request, jsonify, send_file, after_this_request
 import threading
 from patch_worker import process_patch
 import os, zipfile, tempfile, psutil, threading, time, gc
 from datetime import datetime
 from downloader import download_by_rows
-import os
 #from db import get_db_connection   # 👈 yahin attach ho raha hai
 from db import update_patch_progress,get_patch_progress_by_kb,get_all_progress_by_agent,get_db_connection,update_patch_install_progress
 
@@ -84,7 +83,7 @@ def get_devices():
         "devices": devices
     })
 #window patch missing
-@api_bp.route("/api/window-patch-missing", methods=["GET"])
+@app.route("/api/window-patch-missing", methods=["GET"])
 def patch_missing():
     agent_id = request.args.get("agent_id")
     severity = request.args.get("severity")
@@ -167,7 +166,7 @@ def patch_missing():
     })
 
 #window patch scan logs 
-@api_bp.route("/api/window-patch-scan-logs", methods=["GET"])
+@app.route("/api/window-patch-scan-logs", methods=["GET"])
 def patch_scan_logs():
     agent_id = request.args.get("agent_id")
     date_from = request.args.get("from")
@@ -210,7 +209,7 @@ def patch_scan_logs():
         "patch_scan_logs": logs
     })
 # heartbeat status for windows , redhat and ubuntu    
-@api_bp.route("/api/agent/heartbeat-status", methods=["GET"])
+@app.route("/api/agent/heartbeat-status", methods=["GET"])
 def heartbeat_status():
     agent_id = request.args.get("agent_id")
 
@@ -253,24 +252,19 @@ def heartbeat_status():
     return jsonify(row)
 
 #redhat patch missing update 
-@api_bp.route("/api/redhat-patches-missing", methods=["GET"])
+@app.route("/api/redhat-patches-missing", methods=["GET"])
 def get_redhat_patches():
+    agent_id = request.args.get("agent_id")
 
-    agent_ids = request.args.get("agent_id")
-
-    if not agent_ids:
+    if not agent_id:
         return jsonify({"error": "agent_id required"}), 400
 
-    # comma separated → list
-    agent_list = [a.strip() for a in agent_ids.split(",") if a.strip()]
+    agent_id = agent_id.strip()
 
     conn = get_db_connection()
     cur = conn.cursor(dictionary=True)
 
-    # dynamic placeholders
-    placeholders = ",".join(["%s"] * len(agent_list))
-
-    query = f"""
+    cur.execute("""
         SELECT
             id,
             agent_id,
@@ -280,25 +274,30 @@ def get_redhat_patches():
             repo,
             created_at
         FROM redhat_patch_list
-        WHERE agent_id IN ({placeholders})
+        WHERE agent_id = %s
         ORDER BY created_at DESC
-    """
-
-    cur.execute(query, agent_list)
+    """, (agent_id,))
 
     rows = cur.fetchall()
 
     cur.close()
     conn.close()
 
+    if not rows:
+        return jsonify({
+            "agent_id": agent_id,
+            "count": 0,
+            "data": []
+        })
+
     return jsonify({
-        "agent_ids": agent_list,
+        "agent_id": agent_id,
         "count": len(rows),
         "data": rows
     })
 
 # outages status for window , ubuntu and redhat 
-@api_bp.route("/api/agent-outages", methods=["GET"])
+@app.route("/api/agent-outages", methods=["GET"])
 def get_agent_outages():
     hostname = request.args.get("hostname")
     date_from = request.args.get("from")
@@ -348,7 +347,7 @@ def get_agent_outages():
 
 # window download patch
 """
-@api_bp.route("/api/window-download", methods=["POST"])
+@app.route("/api/window-download", methods=["POST"])
 def api_download():
     data = request.get_json(force=True)
 
@@ -377,7 +376,7 @@ def api_download():
 
 # window download patch new one 
 
-@api_bp.route("/api/window-download", methods=["POST"])
+@app.route("/api/window-download", methods=["POST"])
 def api_download():
     data = request.get_json(force=True)
 
@@ -438,7 +437,7 @@ def api_download():
 
 # old progress bar 
 """
-@api_bp.route("/api/window-progress-bar", methods=["GET"])
+@app.route("/api/window-progress-bar", methods=["GET"])
 def api_progress():
     agent_id = request.args.get("agent_id")
     kb = request.args.get("kb")
@@ -458,7 +457,7 @@ def api_progress():
 """
 # window latest progress bar latest
 
-@api_bp.route("/api/window-progress-bar", methods=["GET"])
+@app.route("/api/window-progress-bar", methods=["GET"])
 def api_progress():
     agent_ids = request.args.get("agent_id")
     kbs = request.args.get("kb")
@@ -529,13 +528,12 @@ def log_push(agent_id, status, progress=0, msg=""):
 # =========================================================
 # HEARTBEAT
 # =========================================================
-"""
-@api_bp.route("/api/heartbeat", methods=["POST"])
+@app.route("/api/heartbeat", methods=["POST"])
 def heartbeat():
     agent_id = request.json.get("agent_id")
     last_heartbeat[agent_id] = datetime.now()
     return jsonify({"status": "alive", "memory": get_memory_stats()})
-"""
+
 # =========================================================
 # FLAT ZIP (no extra folder)
 # =========================================================
@@ -560,8 +558,7 @@ def zip_flat(path):
 # =========================================================
 # WINDOW SCHEDULE PUSH OLD 
 # =========================================================
-"""
-@api_bp.route("/api/window-schedule-push", methods=["POST"])
+@app.route("/api/window-schedule-push", methods=["POST"])
 def schedule_push():
 
     data = request.json
@@ -582,12 +579,11 @@ def schedule_push():
         "status": "scheduled",
         "agent_id": agent_id
     })
-"""
 # =========================================================
 # WINDOW SCHEDULE PUSH new 
 # =========================================================
 """
-@api_bp.route("/api/window-schedule-push", methods=["POST"])
+@app.route("/api/window-schedule-push", methods=["POST"])
 def schedule_push():
 
     data = request.get_json(silent=True)
@@ -659,170 +655,27 @@ def schedule_push():
         "mode": pending_push[agent_id]["mode"],
         "folder": pending_push[agent_id]["folder"]
     }), 200
-
-"""
-# FOLDER MISSING STATUS 
-
-#import os
-
-@api_bp.route("/api/window-schedule-push", methods=["POST"])
-def schedule_push():
-
-    global pending_push
-
-    data = request.get_json(silent=True)
-
-    if not data:
-        return jsonify({"error": "Invalid JSON"}), 400
-
-    agent_id = str(data.get("agent_id", "")).strip()
-    folder = data.get("folder")
-
-    if not agent_id:
-        return jsonify({"error": "agent_id required"}), 400
-
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-
-    try:
-        cursor.execute(
-            "SELECT status FROM devices WHERE TRIM(agent_id)=%s",
-            (agent_id,)
-        )
-        device = cursor.fetchone()
-    finally:
-        cursor.close()
-        conn.close()
-
-    if not device:
-        return jsonify({
-            "error": "agent not found",
-            "agent_id": agent_id
-        }), 404
-
-    status = str(device.get("status", "")).strip().lower()
-
-    print("Agent ID:", agent_id)
-    print("DB Status:", device.get("status"))
-    print("Normalized Status:", status)
-
-    # =========================
-    # Agent Offline Check
-    # =========================
-    if status != "online":
-        print("Agent is offline, push cancelled")
-
-        return jsonify({
-            "status": "could not process if agent is offline",
-            "agent_id": agent_id,
-            "agent_status": status
-        }), 200
-
-
-    # =========================
-    # Schedule Push
-    # =========================
-    if folder:
-
-        pending_push[agent_id] = {
-            "mode": "folder",
-            "folder": folder
-        }
-
-        log_push(agent_id, folder, "scheduled", 0, "Patch scheduled")
-
-    else:
-
-        pending_push[agent_id] = {
-            "mode": "agent",
-            "folder": None
-        }
-
-        log_push(agent_id, "full_agent", "scheduled", 0, "Full agent scheduled")
-
-
-    print("Push Scheduled For:", agent_id)
-    print("Pending Queue:", pending_push)
-
-
-    return jsonify({
-        "status": "scheduled",
-        "agent_id": agent_id,
-        "agent_status": status,
-        "mode": pending_push[agent_id]["mode"],
-        "folder": pending_push[agent_id]["folder"]
-    }), 200
-    # ===============================
-    # FOLDER EXIST CHECK
-    # ===============================
-    if folder:
-
-        folder_path = os.path.join(DOWNLOAD_DIR, agent_id, folder)
-
-        if not os.path.isdir(folder_path):
-            return jsonify({
-                "status": "folder missing",
-                "agent_id": agent_id,
-                "folder": folder
-            }), 200   # <-- yaha change kiya
-
-        pending_push[agent_id] = {
-            "mode": "folder",
-            "folder": folder
-        }
-
-        log_push(agent_id, folder, "scheduled", 0, "Patch scheduled")
-
-    else:
-
-        pending_push[agent_id] = {
-            "mode": "agent",
-            "folder": None
-        }
-
-        log_push(agent_id, "full_agent", "scheduled", 0, "Full agent scheduled")
-
-    return jsonify({
-        "status": "scheduled",
-        "agent_id": agent_id,
-        "agent_status": status,
-        "mode": pending_push[agent_id]["mode"],
-        "folder": pending_push[agent_id]["folder"]
-    }), 200
 # =========================================================
 # WINDOW  GET UPDATE
 # =========================================================
-
-def log_push(agent_id, patch_name, status, progress, message):
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # check if already failed
-    cursor.execute("""
-        SELECT status 
-        FROM push_logs 
-        WHERE agent_id=%s AND patch_name=%s
-        ORDER BY id DESC LIMIT 1
-    """, (agent_id, patch_name))
-
-    row = cursor.fetchone()
-
-    if row and row[0] == "failed":
-        # already failed -> do nothing
-        return
-
-    cursor.execute("""
-        INSERT INTO push_logs(agent_id, patch_name, status, progress, message, created_at)
-        VALUES (%s,%s,%s,%s,%s,NOW())
-    """, (agent_id, patch_name, status, progress, message))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-# old get update code     
 """
-@api_bp.route("/api/get-update")
+
+#def log_push(agent_id, patch_name, status, progress, message):
+#    conn = get_db_connection()
+#    cursor = conn.cursor()
+
+   # query = """
+    #INSERT INTO push_logs (agent_id, patch_name, status, progress, message)
+    #VALUES (%s, %s, %s, %s, %s)
+#    """
+
+#    cursor.execute(query, (agent_id, patch_name, status, progress, message))
+#   conn.commit()
+
+#    cursor.close()
+#    conn.close()
+
+@app.route("/api/get-update")
 def get_update():
     agent_id = request.args.get("agent_id")
     job = pending_push.get(agent_id)
@@ -866,74 +719,11 @@ def get_update():
 
     log_push(agent_id, "completed", 100, "Push complete")
     return response
-"""
-
-# new get update code 
-@api_bp.route("/api/get-update")
-def get_update():
-
-    agent_id = request.args.get("agent_id")
-
-    if not agent_id:
-        return jsonify({"error": "agent_id required"}), 400
-
-    job = pending_push.get(agent_id)
-
-    if not job:
-        return jsonify({"status": "no_update"})
-
-    patch_name = job.get("folder") or "full_agent"
-
-    base = os.path.join(DOWNLOAD_DIR, agent_id)
-
-    if not os.path.exists(base):
-        log_push(agent_id, patch_name, "failed", 0, "Agent folder missing")
-        return jsonify({"error": "agent folder missing"}), 404
-
-    if job["mode"] == "agent":
-        target = base
-        log_push(agent_id, patch_name, "zipping", 0, "Zipping full agent")
-
-    else:
-        target = os.path.join(base, job["folder"])
-
-        if not os.path.exists(target):
-            log_push(agent_id, patch_name, "failed", 0, "Folder missing")
-            return jsonify({"error": "folder missing"}), 404
-
-        log_push(agent_id, patch_name, "zipping", 0, f"Zipping folder {job['folder']}")
-
-    zip_path = zip_flat(target)
-
-    pending_push.pop(agent_id, None)
-
-    log_push(agent_id, patch_name, "sending", 100, "Sending update")
-
-    response = send_file(
-        zip_path,
-        as_attachment=True,
-        download_name=f"{agent_id}.zip"
-    )
-
-    @after_this_request
-    def cleanup(response):
-        try:
-            gc.collect()
-            os.remove(zip_path)
-            print("Deleted:", zip_path)
-        except Exception as e:
-            print("Cleanup error:", e)
-        return response
-
-    log_push(agent_id, patch_name, "completed", 100, "Push completed")
-
-    return response
 
 # =========================================================
-# LIVE STATUS old
+# LIVE STATUS
 # =========================================================
-'''
-@api_bp.route("/api/window-push-status", methods=["GET"])
+@app.route("/api/window-push-status", methods=["GET"])
 def push_status():
     agent_id = request.args.get("agent_id")
 
@@ -961,70 +751,10 @@ def push_status():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-'''
-# =========================================================
-# LIVE STATUS new
-# =========================================================
-@api_bp.route("/api/window-push-status", methods=["GET"])
-def push_status():
-
-    agent_id = request.args.get("agent_id")
-    patch_name = request.args.get("patch_name")
-
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-
-        query = """
-            SELECT agent_id, patch_name, status, progress, message, updated_at
-            FROM push_logs
-            WHERE 1=1
-        """
-
-        params = []
-
-        if agent_id:
-            query += " AND agent_id = %s"
-            params.append(agent_id)
-
-        if patch_name:
-            query += " AND patch_name = %s"
-            params.append(patch_name)
-
-        query += " ORDER BY updated_at DESC"
-
-        cursor.execute(query, params)
-
-        rows = cursor.fetchall()
-
-        if not rows:
-            return jsonify({"error": "No push record found"}), 404
-
-        agents = list(set([r["agent_id"] for r in rows]))
-
-        patches = []
-        for r in rows:
-            patches.append({
-                "agent_id": r["agent_id"],
-                "patch_name": r["patch_name"],
-                "progress": r["progress"],
-                "status": r["status"],
-                "message": r["message"],
-                "updated_at": r["updated_at"]
-            })
-
-        return jsonify({
-            "agents": agents,
-            "patches": patches
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500   
 # =========================================================
 # SERVER STATS
 # =========================================================
-@api_bp.route("/api/server-stats")
+@app.route("/api/server-stats")
 def stats():
     return jsonify({
         "memory": get_memory_stats(),
@@ -1032,12 +762,12 @@ def stats():
         "pending_push": len(pending_push)
     })
 
-@api_bp.route("/")
+@app.route("/")
 def home():
     return "🚀 Update Server Running"
 
 
-@api_bp.route("/api/linux-missing-patches", methods=["GET", "POST"])
+@app.route("/api/linux-missing-patches", methods=["GET", "POST"])
 def linux_missing_patches():
     try:
         data = request.get_json(silent=True) if request.method == "POST" else request.args
@@ -1139,7 +869,7 @@ def linux_missing_patches():
 # ==============================
 # API DOWNLOAD PATCHES
 # ==============================
-@api_bp.route("/api/ubuntu-download", methods=["POST"])
+@app.route("/api/ubuntu-download", methods=["POST"])
 def download_by_id():
 
     data = request.get_json()
@@ -1204,7 +934,7 @@ def download_by_id():
 # ==============================
 # DOWNLOAD PROGRESS API
 # ==============================
-@api_bp.route("/api/download-progress")
+@app.route("/api/download-progress")
 def get_progress():
     return jsonify(download_progress)
 
@@ -1212,7 +942,7 @@ def get_progress():
 # ===============================
 # Ubuntu Download PROGRESS API
 # ===============================
-@api_bp.route("/api/ubuntu-download-progress")
+@app.route("/api/ubuntu-download-progress")
 def progress():
     total = download_progress.get("total", 0)
     done = download_progress.get("done", 0)
@@ -1231,7 +961,7 @@ def progress():
 # ===============================
 # Ubuntu push Schedule API
 # ===============================
-@api_bp.route("/api/ubuntu-patch-schedule", methods=["POST"])
+@app.route("/api/ubuntu-patch-schedule", methods=["POST"])
 def ubuntu_patch_schedule():
 
     data = request.json
@@ -1278,7 +1008,7 @@ def ubuntu_patch_schedule():
 # ===============================
 # Ubuntu push PROGRESS API
 # ===============================
-@api_bp.route("/api/linux-patch-check", methods=["POST"])
+@app.route("/api/linux-patch-check", methods=["POST"])
 def linux_patch_check():
 
     data = request.get_json(force=True)
