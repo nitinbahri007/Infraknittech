@@ -15,6 +15,7 @@ import platform
 import os
 from api import api_bp
 
+from linuxpatchupload5 import process_uploaded_packages
 app = Flask(__name__)
 
 app.register_blueprint(api_bp)
@@ -34,6 +35,8 @@ def heartbeat():
     print("🔥 HEARTBEAT API CALLED")
 
     data = request.json or {}
+    print("🔥 DATA RECEIVED:")
+    print(data)
     agent_id = data.get("agent_id")
 
     if not agent_id:
@@ -42,9 +45,9 @@ def heartbeat():
 
     hostname = data.get("hostname") or socket.gethostname()
     ip_address = data.get("ip_address") or request.remote_addr
-    os_name = data.get("os") or platform.system()
+    os_name = data.get("os_name") or platform.system()
     os_version = data.get("os_version") or platform.version()
-    os_architecture = data.get("os_arch") or platform.machine()
+    os_architecture = data.get("os_architecture") or platform.machine()
     agent_version = data.get("agent_version") or "1.0"
 
     now = datetime.now()
@@ -59,12 +62,19 @@ def heartbeat():
     last_heartbeat[agent_id] = now
 
     try:
-
         conn = get_db_connection()
         cursor = conn.cursor()
 
         print("💾 Updating DB...")
 
+        # 🔥 NEW LOGIC: Same IP ke dusre agents disable karo
+        cursor.execute("""
+        UPDATE devices 
+        SET status='DISABLED', updated_at=NOW()
+        WHERE ip_address=%s AND agent_id != %s
+        """, (ip_address, agent_id))
+
+        # 🔥 EXISTING LOGIC (unchanged)
         cursor.execute("""
         INSERT INTO devices (
             agent_id, hostname, ip_address, os_name,
@@ -109,7 +119,6 @@ def heartbeat():
         traceback.print_exc()
 
     return jsonify({"status": "alive", "test": "nitin"}), 200
-
 # ================= PATCH REPORT =================
 @app.route("/api/report", methods=["POST"])
 def receive_report():
@@ -250,7 +259,7 @@ def dashboard():
 def home():
     return "Infra Monitoring Server Running 🚀"
 
-
+"""
 UPLOAD_DIR = "uploads"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -266,6 +275,71 @@ def upload_packages():
     filename = f"{agent_id}_packages.txt"
     path = os.path.join(UPLOAD_DIR, filename)
     file.save(path)
+"""
+UPLOAD_DIR = "uploads"
+# directory create ho jayegi agar exist nahi hai
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@app.route("/api/upload-packages", methods=["POST"])
+def upload_packages():
+
+    # ===============================
+    # VALIDATION
+    # ===============================
+    if "file" not in request.files:
+        return jsonify({"error": "No file"}), 400
+
+    file = request.files["file"]
+
+    if file.filename == "":
+        return jsonify({"error": "Empty filename"}), 400
+
+    agent_id = request.form.get("agent_id", "unknown").strip()
+
+    # ===============================
+    # CREATE FOLDER IF NOT EXISTS
+    # ===============================
+    if not os.path.exists(UPLOAD_DIR):
+        os.makedirs(UPLOAD_DIR)
+
+    filename = f"{agent_id}_packages.txt"
+    path = os.path.join(UPLOAD_DIR, filename)
+
+    # ===============================
+    # SAVE FILE
+    # ===============================
+    try:
+        file.save(path)
+        print(f"✅ File saved: {path}")
+    except Exception as e:
+        print("❌ File save failed:", e)
+        return jsonify({"error": "File save failed"}), 500
+
+    # ===============================
+    # 🔥 TRIGGER PROCESSING (BACKGROUND)
+    # ===============================
+    try:
+        print("🚀 Starting background processing...")
+
+        threading.Thread(
+            target=process_uploaded_packages,
+            daemon=True
+        ).start()
+
+    except Exception as e:
+        print("❌ Processing trigger failed:", e)
+
+    # ===============================
+    # RESPONSE
+    # ===============================
+    return jsonify({
+        "status": "uploaded",
+        "agent_id": agent_id,
+        "file": filename,
+        "path": path
+    })
+
+
 
 # ================= START =================
 if __name__ == "__main__":
