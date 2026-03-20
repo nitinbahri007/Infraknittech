@@ -4,6 +4,7 @@ from patch_worker import process_patch
 import os, zipfile, tempfile, psutil, threading, time, gc
 from datetime import datetime
 from downloader import download_by_rows
+from download_worker import download_by_rows
 import os
 #from db import get_db_connection   # 👈 yahin attach ho raha hai
 from db import update_patch_progress,get_patch_progress_by_kb,get_all_progress_by_agent,get_db_connection,update_patch_install_progress
@@ -1139,6 +1140,7 @@ def linux_missing_patches():
 # ==============================
 # API DOWNLOAD PATCHES
 # ==============================
+"""
 @api_bp.route("/api/ubuntu-download", methods=["POST"])
 def download_by_id():
 
@@ -1158,11 +1160,12 @@ def download_by_id():
     placeholders = ",".join(["%s"] * len(ids))
 
     query = f"""
+"""
         SELECT id, ip_address, package_name, installed_version, latest_version, agent_id
         FROM linux_patches
         WHERE id IN ({placeholders})
     """
-
+"""
     cursor.execute(query, ids)
     rows = cursor.fetchall()
 
@@ -1200,7 +1203,116 @@ def download_by_id():
         "total": len(rows),
         "packages": packages
     })
+"""
 
+@api_bp.route("/api/ubuntu-download", methods=["POST"])
+def download_by_id():
+    data = request.get_json()
+    ids  = data.get("ids")
+ 
+    if not ids:
+        return jsonify({"error": "ids required"}), 400
+ 
+    # Single id → list
+    if not isinstance(ids, list):
+        ids = [ids]
+ 
+    conn   = get_db_connection()
+    cursor = conn.cursor()
+ 
+    placeholders = ",".join(["%s"] * len(ids))
+ 
+    # Fetch patch info + os_version + patch_type from devices join
+    query = f"""
+        SELECT
+            p.id,
+            d.ip_address,
+            p.package_name,
+            p.installed_version,
+            p.latest_version,
+            p.agent_id,
+            d.os_version,
+            p.patch_type
+        FROM linux_patches p
+        JOIN devices d ON p.agent_id = d.agent_id
+        WHERE p.id IN ({placeholders})
+    """
+ 
+    cursor.execute(query, ids)
+    rows = cursor.fetchall()
+ 
+    cursor.close()
+    conn.close()
+ 
+    if not rows:
+        return jsonify({"error": "No patches found"}), 404
+ 
+    # Reset progress store for this batch
+    download_progress.update({
+        "status" : "started",
+        "total"  : len(rows),
+        "done"   : 0,
+        "failed" : 0,
+        "items"  : {}
+    })
+ 
+    # Build packages list for response
+    packages = []
+    for row in rows:
+        patch_id, ip, pkg, installed_ver, latest_ver, agent_id, os_version, patch_type = row
+        packages.append({
+            "id"                : patch_id,
+            "ip_address"        : ip,
+            "package_name"      : pkg,
+            "installed_version" : installed_ver,
+            "latest_version"    : latest_ver,
+            "agent_id"          : agent_id
+        })
+ 
+        # Pre-populate progress items
+        download_progress["items"][str(patch_id)] = {
+            "patch_id" : patch_id,
+            "ip"       : ip,
+            "package"  : pkg,
+            "status"   : "queued",
+            "files"    : [],
+            "message"  : "Waiting..."
+        }
+ 
+    # Start background download thread
+    thread = threading.Thread(
+        target=download_by_rows,
+        args=(rows, download_progress),
+        daemon=True
+    )
+    thread.start()
+ 
+    return jsonify({
+        "status"   : "started",
+        "total"    : len(rows),
+        "packages" : packages
+    })
+ 
+ 
+# =========================
+# GET /api/ubuntu-download-progress
+# Returns live progress of current download batch
+# =========================
+@api_bp.route("/api/ubuntu-download-progress")
+def progress():
+    total   = download_progress.get("total", 0)
+    done    = download_progress.get("done", 0)
+    failed  = download_progress.get("failed", 0)
+    percent = round((done / total * 100), 2) if total else 0
+ 
+    return jsonify({
+        "status"  : download_progress.get("status", "idle"),
+        "total"   : total,
+        "done"    : done,
+        "failed"  : failed,
+        "percent" : percent,
+        "items"   : download_progress.get("items", {})
+    })
 # ==============================
 # DOWNLOAD PROGRESS API
 # ==============================
@@ -1212,6 +1324,7 @@ def get_progress():
 # ===============================
 # Ubuntu Download PROGRESS API
 # ===============================
+"""
 @api_bp.route("/api/ubuntu-download-progress")
 def progress():
     total = download_progress.get("total", 0)
@@ -1225,6 +1338,7 @@ def progress():
         "percent": round(percent, 2),
         "items": download_progress.get("items", {})
     })
+"""
 
 
 

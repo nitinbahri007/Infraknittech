@@ -353,7 +353,7 @@ Content-Type: application/json
 
 ```
 {
-  "id": "22",
+  "id": "143",
   "agent_id": "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef"
 }
 
@@ -361,8 +361,18 @@ Content-Type: application/json
 
 ```json
 {
-  "status": "accepted",
-  "jobs": 1
+    "packages": [
+        {
+            "agent_id": "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+            "id": 143,
+            "installed_version": "2.4.9",
+            "ip_address": "10.10.10.91",
+            "latest_version": "2.4.14",
+            "package_name": "apt-utils"
+        }
+    ],
+    "status": "started",
+    "total": 1
 }
 
 ```
@@ -385,10 +395,6 @@ Content-Type: application/json
 
 
 ```json
-{
-  "status": "accepted",
-  "jobs": 2
-}
 
 ```
 
@@ -421,12 +427,18 @@ http://10.10.8.19:5000/api/ubuntu-download-progress?agent_id=c959c3c5-3ce6-4e0c-
 ```
 
 ```json 
-
 {
-    "done": 1,
-    "items": {},
-    "percent": 100.0,
-    "status": "completed",
+    "packages": [
+        {
+            "agent_id": "c959c3c5-3ce6-4e0c-9b85-a6eac88ed6ef",
+            "id": 143,
+            "installed_version": "2.4.9",
+            "ip_address": "10.10.10.91",
+            "latest_version": "2.4.14",
+            "package_name": "apt-utils"
+        }
+    ],
+    "status": "started",
     "total": 1
 }
 
