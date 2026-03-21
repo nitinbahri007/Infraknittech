@@ -1345,6 +1345,7 @@ def progress():
 # ===============================
 # Ubuntu push Schedule API
 # ===============================
+"""
 @api_bp.route("/api/ubuntu-patch-schedule", methods=["POST"])
 def ubuntu_patch_schedule():
 
@@ -1389,9 +1390,11 @@ def ubuntu_patch_schedule():
         "agent_id": agent_id,
         "patch_file": patch_file
     })
+"""
 # ===============================
 # Ubuntu push PROGRESS API
 # ===============================
+"""
 @api_bp.route("/api/linux-patch-check", methods=["POST"])
 def linux_patch_check():
 
@@ -1411,6 +1414,601 @@ def linux_patch_check():
         })
 
     return jsonify({"action": "none"})
+"""
+# ===============================
+# new  Ubuntu push  API
+# ===============================
+
+LINUX_PATCHES_DIR = "/opt/nms/Report/Agent/server/Infraknittech/linux_patches"
+
+# =========================
+# PUSH PROGRESS STORE
+# =========================
+push_progress = {
+    "status" : "idle",
+    "total"  : 0,
+    "done"   : 0,
+    "failed" : 0,
+    "items"  : {}
+}
+
+# Pending patches — agent poll karta hai yahan se
+# { agent_id: { "patch_ids": [141, 142] } }
+pending_ubuntu_patch = {}
+
+# =========================
+# DB HELPERS
+# =========================
+def ensure_push_log_table():
+    try:
+        conn   = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ubuntu_push_log (
+                id        INT AUTO_INCREMENT PRIMARY KEY,
+                agent_id  VARCHAR(100),
+                patch_id  INT,
+                package   VARCHAR(200),
+                version   VARCHAR(100),
+                file_name VARCHAR(300),
+                status    VARCHAR(50),
+                message   TEXT,
+                pushed_at DATETIME
+            )
+        """)
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"⚠️  Could not create ubuntu_push_log table: {e}")
+
+def log_push_to_db(agent_id, patch_id, package, version, file_name, status, message):
+    try:
+        conn   = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO ubuntu_push_log
+                (agent_id, patch_id, package, version, file_name, status, message, pushed_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (agent_id, patch_id, package, version, file_name, status, message,
+              datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"⚠️  DB log error patch {patch_id}: {e}")
+
+def log_patch_alert(agent_id, package, message, category):
+    try:
+        conn   = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO patch_alert
+                (agent_id, kb, message, category, created_at)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (agent_id, package, message, category,
+              datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"⚠️  patch_alert insert error: {e}")
+
+
+# =========================
+# BACKGROUND PUSH WORKER
+# HTTP push nahi — sirf pending_ubuntu_patch mein store karo
+# Agent khud pull karega
+# =========================
+def push_worker(jobs, patch_info, devices, progress_store):
+    progress_store["status"] = "running"
+ 
+    for agent_id, patch_id in jobs:
+        key     = f"{agent_id}_{patch_id}"
+        device  = devices.get(agent_id)
+        row     = patch_info.get(patch_id)
+        package = row["package_name"] if row else "unknown"
+        version = row["latest_version"] if row else ""
+        ip      = row["ip_address"] if row else ""
+ 
+        progress_store["items"][key]["status"]  = "processing"
+        progress_store["items"][key]["message"] = "Validating..."
+ 
+        # CHANGED — Fresh device status DB se fetch karo (cached dict purana ho sakta hai)
+        try:
+            _conn   = get_db_connection()
+            _cursor = _conn.cursor(dictionary=True)
+            _cursor.execute("SELECT status, ip_address FROM devices WHERE agent_id = %s", (agent_id,))
+            fresh_device = _cursor.fetchone()
+            _cursor.close()
+            _conn.close()
+            if fresh_device:
+                device = fresh_device
+        except Exception as e:
+            print(f"Could not refresh device status: {e}")
+ 
+        # CHECK 1: Agent offline
+        if not device or device["status"].upper() != "ONLINE":
+            msg = f"Agent is offline — cannot schedule patch {patch_id}"
+            progress_store["items"][key].update({
+                "status" : "failed",
+                "message": msg,
+                "reason" : "AGENT_OFFLINE"
+            })
+            progress_store["done"]   += 1
+            progress_store["failed"] += 1
+            log_push_to_db(agent_id, patch_id, package, version, "", "failed", msg)
+            log_patch_alert(agent_id, package, msg, "AGENT_OFFLINE")  # CHANGED — log_push() call hataya
+            continue
+ 
+        # CHECK 2: Patch not found in DB
+        if not row:
+            msg = f"Patch {patch_id} not found in DB"
+            progress_store["items"][key].update({
+                "status" : "failed",
+                "message": msg,
+                "reason" : "PATCH_NOT_FOUND"
+            })
+            progress_store["done"]   += 1
+            progress_store["failed"] += 1
+            log_push_to_db(agent_id, patch_id, package, version, "", "failed", msg)
+            log_patch_alert(agent_id, package, msg, "PUSH_FAILED")  # CHANGED — log_push() call hataya
+            continue
+ 
+        # CHECK 3: Folder missing
+        patch_folder = os.path.join(LINUX_PATCHES_DIR, f"{ip}_{patch_id}")
+        if not os.path.exists(patch_folder):
+            msg = f"Patch folder is missing — please run download first"
+            progress_store["items"][key].update({
+                "status" : "failed",
+                "message": msg,
+                "reason" : "FOLDER_MISSING"
+            })
+            progress_store["done"]   += 1
+            progress_store["failed"] += 1
+            log_push_to_db(agent_id, patch_id, package, version, "", "failed", msg)
+            log_patch_alert(agent_id, package, msg, "FOLDER_MISSING")  # CHANGED — log_push() call hataya
+            continue
+ 
+        # CHECK 4: No .deb files
+        deb_files = [f for f in os.listdir(patch_folder) if f.endswith(".deb")]
+        if not deb_files:
+            msg = "Patch folder is empty — no .deb files found"
+            progress_store["items"][key].update({
+                "status" : "failed",
+                "message": msg,
+                "reason" : "FOLDER_EMPTY"
+            })
+            progress_store["done"]   += 1
+            progress_store["failed"] += 1
+            log_push_to_db(agent_id, patch_id, package, version, "", "failed", msg)
+            log_patch_alert(agent_id, package, msg, "FOLDER_EMPTY")  # CHANGED — log_push() call hataya
+            continue
+ 
+        # ALL CHECKS PASSED
+        # Store in pending_ubuntu_patch — agent will pull this
+        if agent_id not in pending_ubuntu_patch:
+            pending_ubuntu_patch[agent_id] = {"patch_ids": []}
+ 
+        if patch_id not in pending_ubuntu_patch[agent_id]["patch_ids"]:
+            pending_ubuntu_patch[agent_id]["patch_ids"].append(patch_id)
+ 
+        msg = f"Scheduled — waiting for agent to pull ({len(deb_files)} files ready)"
+        progress_store["items"][key].update({
+            "status"      : "scheduled",
+            "message"     : msg,
+            "reason"      : "SUCCESS",
+            "total_files" : len(deb_files)
+        })
+        progress_store["done"] += 1
+ 
+        log_push_to_db(agent_id, patch_id, package, version, "", "scheduled", msg)
+        log_patch_alert(agent_id, package, msg, "PATCH_SCHEDULED")  # CHANGED — log_push() call hataya
+ 
+    progress_store["status"] = "completed"
+ 
+
+# =========================
+# POST /api/ubuntu-patch-schedule
+# =========================
+@api_bp.route("/api/ubuntu-patch-schedule", methods=["POST"])
+def ubuntu_patch_schedule():
+    ensure_push_log_table()
+ 
+    data    = request.json
+    patches = data.get("patches")
+ 
+    if not patches or not isinstance(patches, list):
+        return jsonify({"error": "patches list required"}), 400
+ 
+    agent_ids = list(set(p["agent_id"] for p in patches if p.get("agent_id")))
+ 
+    conn   = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+ 
+    ph = ",".join(["%s"] * len(agent_ids))
+    cursor.execute(f"""
+        SELECT agent_id, status, ip_address
+        FROM devices WHERE agent_id IN ({ph})
+    """, agent_ids)
+    devices = {row["agent_id"]: row for row in cursor.fetchall()}
+ 
+    all_patch_ids = []
+    for p in patches:
+        ids = p.get("patch_ids", [])
+        if not isinstance(ids, list):
+            ids = [ids]
+        all_patch_ids.extend([int(i) for i in ids])
+    all_patch_ids = list(set(all_patch_ids))
+ 
+    ph2 = ",".join(["%s"] * len(all_patch_ids))
+    cursor.execute(f"""
+        SELECT id, agent_id, ip_address, package_name, latest_version
+        FROM linux_patches WHERE id IN ({ph2})
+    """, all_patch_ids)
+    patch_info = {row["id"]: row for row in cursor.fetchall()}
+ 
+    cursor.close()
+    conn.close()
+ 
+    jobs       = []
+    pre_errors = []
+ 
+    for entry in patches:
+        agent_id  = entry.get("agent_id")
+        patch_ids = entry.get("patch_ids", [])
+        if not isinstance(patch_ids, list):
+            patch_ids = [patch_ids]
+ 
+        if agent_id not in devices:
+            pre_errors.append({
+                "agent_id": agent_id,
+                "status"  : "failed",
+                "reason"  : "AGENT_NOT_FOUND",
+                "message" : f"Agent '{agent_id}' not found in DB"
+            })
+            continue
+ 
+        if devices[agent_id]["status"].upper() != "ONLINE":
+            pre_errors.append({
+                "agent_id": agent_id,
+                "status"  : "failed",
+                "reason"  : "AGENT_OFFLINE",
+                "message" : f"Agent '{agent_id}' is offline"
+            })
+            continue
+ 
+        for patch_id in patch_ids:
+            patch_id = int(patch_id)
+            row      = patch_info.get(patch_id)
+ 
+            # CHANGED 20-03-2026 14:06 — schedule se pehle folder check karo
+            if not row:
+                pre_errors.append({
+                    "agent_id": agent_id,
+                    "patch_id": patch_id,
+                    "status"  : "failed",
+                    "reason"  : "PATCH_NOT_FOUND",
+                    "message" : f"Patch {patch_id} not found in DB"
+                })
+                continue
+ 
+            ip           = row["ip_address"]
+            patch_folder = os.path.join(LINUX_PATCHES_DIR, f"{ip}_{patch_id}")
+ 
+            if not os.path.exists(patch_folder):
+                pre_errors.append({
+                    "agent_id": agent_id,
+                    "patch_id": patch_id,
+                    "package" : row["package_name"],
+                    "status"  : "failed",
+                    "reason"  : "FOLDER_MISSING",
+                    "message" : f"Patch folder missing — please run download first: {patch_folder}"
+                })
+                continue
+ 
+            deb_files = [f for f in os.listdir(patch_folder) if f.endswith(".deb")]
+            if not deb_files:
+                pre_errors.append({
+                    "agent_id": agent_id,
+                    "patch_id": patch_id,
+                    "package" : row["package_name"],
+                    "status"  : "failed",
+                    "reason"  : "FOLDER_EMPTY",
+                    "message" : f"Patch folder empty — please run download first"
+                })
+                continue
+ 
+            jobs.append((agent_id, patch_id))
+ 
+    if not jobs:
+        return jsonify({
+            "status"    : "failed",
+            "message"   : "No valid jobs — check pre_errors for details",
+            "pre_errors": pre_errors
+        }), 400
+ 
+    push_progress.update({
+        "status": "started",
+        "total" : len(jobs),
+        "done"  : 0,
+        "failed": 0,
+        "items" : {}
+    })
+ 
+    packages = []
+    for agent_id, patch_id in jobs:
+        row     = patch_info.get(patch_id, {})
+        package = row.get("package_name", "unknown")
+        key     = f"{agent_id}_{patch_id}"
+ 
+        push_progress["items"][key] = {
+            "agent_id"   : agent_id,
+            "patch_id"   : patch_id,
+            "package"    : package,
+            "status"     : "queued",
+            "total_files": 0,
+            "message"    : "Waiting...",
+            "reason"     : ""
+        }
+        packages.append({
+            "agent_id": agent_id,
+            "patch_id": patch_id,
+            "package" : package
+        })
+ 
+    thread = threading.Thread(
+        target=push_worker,
+        args=(jobs, patch_info, devices, push_progress),
+        daemon=True
+    )
+    thread.start()
+ 
+    return jsonify({
+        "status"    : "started",
+        "total"     : len(jobs),
+        "packages"  : packages,
+        "pre_errors": pre_errors
+    })
+ 
+
+# =========================
+# GET /api/ubuntu-push-progress
+# =========================
+@api_bp.route("/api/ubuntu-push-progress")
+def ubuntu_push_progress():
+    total   = push_progress.get("total", 0)
+    done    = push_progress.get("done", 0)
+    failed  = push_progress.get("failed", 0)
+    percent = round((done / total * 100), 2) if total else 0
+
+    return jsonify({
+        "status" : push_progress.get("status", "idle"),
+        "total"  : total,
+        "done"   : done,
+        "failed" : failed,
+        "percent": percent,
+        "items"  : push_progress.get("items", {})
+    })
+
+
+# =========================
+# GET /api/ubuntu-patch-pending
+# Agent har heartbeat pe yahan se pending patches leta hai
+# =========================
+@api_bp.route("/api/ubuntu-patch-pending", methods=["GET"])
+def ubuntu_patch_pending():
+    agent_id = request.args.get("agent_id")
+
+    if not agent_id:
+        return jsonify({"error": "agent_id required"}), 400
+
+    pending = pending_ubuntu_patch.get(agent_id)
+
+    if not pending:
+        return jsonify({"patches": []})
+
+    patch_ids = pending.get("patch_ids", [])
+    if not patch_ids:
+        return jsonify({"patches": []})
+
+    conn   = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    ph = ",".join(["%s"] * len(patch_ids))
+    cursor.execute(f"""
+        SELECT p.id, p.package_name, p.latest_version, d.ip_address
+        FROM linux_patches p
+        JOIN devices d ON p.agent_id = d.agent_id
+        WHERE p.id IN ({ph}) AND p.agent_id = %s
+    """, (*patch_ids, agent_id))
+    rows = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    patches = []
+    for row in rows:
+        patch_id     = row["id"]
+        ip           = row["ip_address"]
+        package      = row["package_name"]
+        version      = row["latest_version"]
+        patch_folder = os.path.join(LINUX_PATCHES_DIR, f"{ip}_{patch_id}")
+
+        if not os.path.exists(patch_folder):
+            continue
+
+        deb_files = [f for f in os.listdir(patch_folder) if f.endswith(".deb")]
+        if not deb_files:
+            continue
+
+        patches.append({
+            "patch_id": patch_id,
+            "package" : package,
+            "version" : version,
+            "files"   : [
+                {
+                    "name": f,
+                    "url" : f"/api/ubuntu-patch-file/{patch_id}/{f}"
+                }
+                for f in deb_files
+            ]
+        })
+
+    # Clear pending after sending
+    if patches:
+        del pending_ubuntu_patch[agent_id]
+        print(f"📤 Sent {len(patches)} patch(es) to agent {agent_id[:12]}..")
+
+    return jsonify({"patches": patches})
+
+
+# =========================
+# GET /api/ubuntu-patch-file/<patch_id>/<filename>
+# Agent is URL se .deb file download karta hai
+# =========================
+@api_bp.route("/api/ubuntu-patch-file/<int:patch_id>/<path:filename>", methods=["GET"])
+def ubuntu_patch_file(patch_id, filename):
+    from urllib.parse import unquote, quote
+ 
+    from urllib.parse import unquote
+    # CHANGED 20-03-2026 12:49 — %3a → : decode karo
+    decoded_name = unquote(filename)
+ 
+    if not decoded_name.endswith(".deb"):
+        return jsonify({"error": "Only .deb files allowed"}), 400
+ 
+    for folder in os.listdir(LINUX_PATCHES_DIR):
+        if folder.endswith(f"_{patch_id}"):
+            folder_path = os.path.join(LINUX_PATCHES_DIR, folder)
+ 
+            # CHANGED 20-03-2026 12:49 — 3 versions try karo:
+            # 1. decoded naam (: wala)
+            # 2. encoded naam (%3a wala) — purani files jo %3a se save huin
+            # 3. folder scan — exact match dhundo
+            encoded_name = decoded_name.replace(":", "%3a")
+            found_path   = None
+ 
+            for try_name in [decoded_name, encoded_name]:
+                p = os.path.join(folder_path, try_name)
+                if os.path.exists(p):
+                    found_path = p
+                    break
+ 
+            # Agar dono nahi mile toh folder scan karo
+            if not found_path:
+                for f in os.listdir(folder_path):
+                    if unquote(f) == decoded_name or f == encoded_name:
+                        found_path = os.path.join(folder_path, f)
+                        break
+ 
+            if found_path:
+                print(f"📦 Serving: {found_path}")
+                return send_file(
+                    found_path,
+                    as_attachment=True,
+                    download_name=decoded_name,
+                    mimetype="application/octet-stream"
+                )
+ 
+    return jsonify({"error": f"File not found: {filename}"}), 404
+ 
+ 
+# =========================
+# POST /api/ubuntu-patch-callback
+# Agent install ke baad yahan callback karta hai
+# =========================
+@api_bp.route("/api/ubuntu-patch-callback", methods=["POST"])
+def ubuntu_patch_callback():
+    data             = request.json
+    agent_id         = data.get("agent_id")
+    patch_id         = data.get("patch_id")
+    package          = data.get("package", "")
+    status           = data.get("status", "")
+    message          = data.get("message", "")
+    downloaded_files = data.get("downloaded_files", [])  # CHANGED 20-03-2026 13:06
+    failed_files     = data.get("failed_files", [])      # CHANGED 20-03-2026 13:06
+ 
+    if not all([agent_id, patch_id, status]):
+        return jsonify({"error": "agent_id, patch_id, status required"}), 400
+ 
+    # CHANGED 20-03-2026 13:06 — received/partial_received categories
+    category_map = {
+        "installed"        : "PATCH_INSTALLED",
+        "failed"           : "PATCH_INSTALL_FAILED",
+        "received"         : "PATCH_RECEIVED",
+        "partial_received" : "PATCH_PARTIAL_RECEIVED",
+    }
+    category = category_map.get(status.lower(), "PATCH_STATUS_UPDATE")
+ 
+    try:
+        conn   = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        now    = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+ 
+        # patch_alert — ek summary row
+        cursor.execute("""
+            INSERT INTO patch_alert
+                (agent_id, kb, message, category, created_at)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (agent_id, package,
+              message or f"Patch {status}: {package}",
+              category, now))
+ 
+        # CHANGED 20-03-2026 13:06 — har downloaded file ka alag log
+        if downloaded_files:
+            for fname in downloaded_files:
+                cursor.execute("""
+                    INSERT INTO ubuntu_push_log
+                        (agent_id, patch_id, package, version, file_name, status, message, pushed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (agent_id, patch_id, package, "", fname, "received",
+                      f"File received by agent", now))
+ 
+        # CHANGED 20-03-2026 13:06 — har failed file ka alag log
+        if failed_files:
+            for fname in failed_files:
+                cursor.execute("""
+                    INSERT INTO ubuntu_push_log
+                        (agent_id, patch_id, package, version, file_name, status, message, pushed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (agent_id, patch_id, package, "", fname, "failed",
+                      f"File not received by agent", now))
+ 
+        # Agar koi file list nahi aayi toh single callback row
+        if not downloaded_files and not failed_files:
+            cursor.execute("""
+                INSERT INTO ubuntu_push_log
+                    (agent_id, patch_id, package, version, file_name, status, message, pushed_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (agent_id, patch_id, package, "", "callback", status, message, now))
+ 
+        # linux_patches status update
+        cursor.execute("""
+            UPDATE linux_patches
+            SET patch_status = %s, updated_at = %s
+            WHERE id = %s AND agent_id = %s
+        """, (status, now, patch_id, agent_id))
+ 
+        conn.commit()
+        cursor.close()
+        conn.close()
+ 
+        # push_progress memory update
+        key = f"{agent_id}_{patch_id}"
+        if key in push_progress.get("items", {}):
+            push_progress["items"][key].update({
+                "status"          : status,
+                "message"         : message or f"Agent reported: {status}",
+                "downloaded_files": downloaded_files,  # CHANGED 20-03-2026 13:06
+                "failed_files"    : failed_files        # CHANGED 20-03-2026 13:06
+            })
+ 
+        return jsonify({"status": "ok", "recorded": category})
+ 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500 
+
 
 
 

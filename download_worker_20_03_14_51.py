@@ -18,19 +18,9 @@ docker_map = {
     "24.04": "ubuntu:24.04",
 }
 
-# CHANGED 20-03-2026 14:42 — codename map for external repos
-codename_map = {
-    "20.04": "focal",
-    "22.04": "jammy",
-    "24.04": "noble",
-}
-
 package_map = {
     "apt-ntop": "ntopng",
 }
-
-# CHANGED 20-03-2026 14:42 — MongoDB package patterns
-MONGODB_PACKAGES = ["mongodb", "mongodb-org", "mongod", "mongos"]
 
 # =========================
 # HELPERS
@@ -38,18 +28,6 @@ MONGODB_PACKAGES = ["mongodb", "mongodb-org", "mongod", "mongos"]
 def normalize_version(v):
     m = re.search(r'\d+\.\d+', str(v))
     return m.group() if m else "22.04"
-
-# CHANGED 20-03-2026 14:42 — detect repo type from package name
-def detect_repo(package, patch_type):
-    pkg = package.lower()
-    pt  = str(patch_type).lower()
-    if any(m in pkg for m in MONGODB_PACKAGES):
-        return "mongodb"
-    if "ntop" in pkg:
-        return "ntopng"
-    if "external" in pt:
-        return "external"
-    return "standard"
 
 def is_already_downloaded(final_dest):
     if not os.path.exists(final_dest):
@@ -105,12 +83,8 @@ def download_single_patch(patch_id, ip, os_version, package, patch_type,
 
     actual_package = package_map.get(package.lower(), package)
     version        = normalize_version(os_version)
-    codename       = codename_map.get(version, "jammy")
     image          = docker_map.get(version, "ubuntu:22.04")
     final_dest     = os.path.join(LINUX_PATCHES_DIR, f"{ip}_{patch_id}")
-
-    # CHANGED 20-03-2026 14:42 — detect repo type
-    repo_type = detect_repo(actual_package, patch_type)
 
     # Update progress → running
     progress_store["items"][str(patch_id)] = {
@@ -136,6 +110,7 @@ def download_single_patch(patch_id, ip, os_version, package, patch_type,
         })
         progress_store["done"] += 1
 
+        # Log skipped to DB
         file_path = os.path.join(final_dest, existing[0]) if existing else final_dest
         log_to_db(patch_id, agent_id, ip, actual_package, latest_version,
                   file_path, "skipped", msg, "ALREADY_DOWNLOADED")
@@ -146,15 +121,10 @@ def download_single_patch(patch_id, ip, os_version, package, patch_type,
     output_path = os.path.join(home, "patches", f"{ip}_{patch_id}")
     os.makedirs(output_path, exist_ok=True)
 
-    # Common dep download snippet
-    dep_snippet = f"""
-for dep in $(apt-cache depends {actual_package} 2>/dev/null \
-    | grep "  Depends:" | awk "{{{{print \$2}}}}" | tr -d "<>"); do
-    apt-get download "$dep" 2>/dev/null || true
-done"""
+    is_ntop     = "ntop" in actual_package.lower()
+    is_external = "external" in str(patch_type).lower() and not is_ntop
 
-    # CHANGED 20-03-2026 14:42 — repo based docker command
-    if repo_type == "mongodb":
+    if is_external:
         docker_cmd = f"""
 docker run --rm \
   -v {output_path}:/out \
@@ -163,15 +133,15 @@ docker run --rm \
 set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y gnupg curl software-properties-common 2>&1 | tail -3
-curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc \
-    | gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
-echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu {codename}/mongodb-org/7.0 multiverse" \
-    | tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+apt-get install -y software-properties-common 2>&1 | tail -3
+add-apt-repository universe -y 2>/dev/null || true
 apt-get update -qq
 cd /out
 apt-get download {actual_package} 2>&1 || true
-{dep_snippet}
+for dep in $(apt-cache depends {actual_package} 2>/dev/null \
+    | grep "  Depends:" | awk "{{print \$2}}" | tr -d "<>"); do
+    apt-get download "$dep" 2>/dev/null || true
+done
 '
 """
     else:
@@ -188,7 +158,10 @@ add-apt-repository universe -y 2>/dev/null || true
 apt-get update -qq
 cd /out
 apt-get download {actual_package} 2>&1 || true
-{dep_snippet}
+for dep in $(apt-cache depends {actual_package} 2>/dev/null \
+    | grep "  Depends:" | awk "{{print \$2}}" | tr -d "<>"); do
+    apt-get download "$dep" 2>/dev/null || true
+done
 '
 """
 

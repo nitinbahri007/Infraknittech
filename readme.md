@@ -1,3 +1,4 @@
+# Developed by nitin bahri 
 # 📦 Patch Management API
 
 A lightweight Patch Management backend for managing **Windows, Red Hat (RHEL), and Ubuntu agents, devices, and updates**.
