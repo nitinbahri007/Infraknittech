@@ -5,10 +5,10 @@ from datetime import datetime
 # 🔌 Database Connection
 def get_db_connection():
     return mysql.connector.connect(
-        host="xxxx",
-        user="xxxx",
+        host="10.10.10.91",
+        user="root",
         password="xxxx",
-        database="xxxx",
+        database="infra_monitor",
         connection_timeout=5
     )
 

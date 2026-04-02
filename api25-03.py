@@ -4,21 +4,11 @@ from patch_worker import process_patch
 import os, zipfile, tempfile, psutil, threading, time, gc
 from datetime import datetime
 from downloader import download_by_rows
-from download_worker import download_by_ubuntu_rows
-from redhat_worker import download_by_redhat_rows
-
-from pathlib import Path
-#from download_worker import download_by_rows
+from download_worker import download_by_rows
 import os
 #from db import get_db_connection   # 👈 yahin attach ho raha hai
 from db import update_patch_progress,get_patch_progress_by_kb,get_all_progress_by_agent,get_db_connection,update_patch_install_progress
 
-from redhat_deploy_worker import (
-    queue_deploy,
-    get_pending_deploys,
-    update_deploy_status,
-    get_deploy_status,
-)
 
 #app = Flask(__name__)
 api_bp = Blueprint("api", __name__)
@@ -735,6 +725,7 @@ def schedule_push():
 # FOLDER MISSING STATUS 
 
 #import os
+
 @api_bp.route("/api/window-schedule-push", methods=["POST"])
 def schedule_push():
 
@@ -772,29 +763,27 @@ def schedule_push():
 
     status = str(device.get("status", "")).strip().lower()
 
+    print("Agent ID:", agent_id)
+    print("DB Status:", device.get("status"))
+    print("Normalized Status:", status)
+
     # =========================
     # Agent Offline Check
     # =========================
     if status != "online":
+        print("Agent is offline, push cancelled")
+
         return jsonify({
             "status": "could not process if agent is offline",
             "agent_id": agent_id,
             "agent_status": status
         }), 200
 
+
     # =========================
-    # Folder Exist Check
+    # Schedule Push
     # =========================
     if folder:
-        DOWNLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
-        folder_path = os.path.join(DOWNLOAD_DIR, agent_id, folder)
-
-        if not os.path.isdir(folder_path):
-            return jsonify({
-                "status": "folder missing",
-                "agent_id": agent_id,
-                "folder": folder
-            }), 200
 
         pending_push[agent_id] = {
             "mode": "folder",
@@ -802,23 +791,58 @@ def schedule_push():
         }
 
         log_push(agent_id, folder, "scheduled", 0, "Patch scheduled")
-        log_patch_alert(agent_id, folder, "Patch has been scheduled", "patch_scheduled")  # ✅ if block ke andar
 
     else:
+
         pending_push[agent_id] = {
             "mode": "agent",
             "folder": None
         }
 
         log_push(agent_id, "full_agent", "scheduled", 0, "Full agent scheduled")
-        log_patch_alert(agent_id, "full_agent", "Full agent patch has been scheduled", "patch_scheduled")  # ✅ else block ke andar
+
 
     print("Push Scheduled For:", agent_id)
     print("Pending Queue:", pending_push)
 
-    # =========================
-    # Schedule Push
-    # =========================
+
+    return jsonify({
+        "status": "scheduled",
+        "agent_id": agent_id,
+        "agent_status": status,
+        "mode": pending_push[agent_id]["mode"],
+        "folder": pending_push[agent_id]["folder"]
+    }), 200
+    # ===============================
+    # FOLDER EXIST CHECK
+    # ===============================
+    if folder:
+
+        folder_path = os.path.join(DOWNLOAD_DIR, agent_id, folder)
+
+        if not os.path.isdir(folder_path):
+            return jsonify({
+                "status": "folder missing",
+                "agent_id": agent_id,
+                "folder": folder
+            }), 200   # <-- yaha change kiya
+
+        pending_push[agent_id] = {
+            "mode": "folder",
+            "folder": folder
+        }
+
+        log_push(agent_id, folder, "scheduled", 0, "Patch scheduled")
+
+    else:
+
+        pending_push[agent_id] = {
+            "mode": "agent",
+            "folder": None
+        }
+
+        log_push(agent_id, "full_agent", "scheduled", 0, "Full agent scheduled")
+
     return jsonify({
         "status": "scheduled",
         "agent_id": agent_id,
@@ -945,7 +969,7 @@ def get_update():
     pending_push.pop(agent_id, None)
 
     log_push(agent_id, patch_name, "sending", 100, "Sending update")
-    log_patch_alert(agent_id, patch_name, "Patch downloaded by agent", "received") 
+
     response = send_file(
         zip_path,
         as_attachment=True,
@@ -1057,82 +1081,7 @@ def push_status():
         })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-   
-# ================= PATCH MISSING STATUS UPDATE =================
-def mark_patch_installed(agent_id, kb):
-    try:
-        conn   = get_db_connection()
-        cursor = conn.cursor()
-
-        # ✅ KB prefix hata do agar hai toh
-        kb_clean = kb.upper().replace("KB", "").strip()
-
-        cursor.execute("""
-            UPDATE patch_missing
-            SET deploy_status = 1
-            WHERE agent_id = %s AND kb = %s
-        """, (agent_id, kb_clean))
-
-        conn.commit()
-        print(f"✅ patch_missing updated → agent: {agent_id} | kb: {kb_clean} | rows: {cursor.rowcount}")
-
-    except Exception as e:
-        print(f"❌ patch_missing update error: {e}")
-
-    finally:
-        cursor.close()
-        conn.close()
-
-# =========================================================
-# WINDOW PATCH STATUS UPDATE
-# =========================================================
-@api_bp.route("/api/window-patch-status-update", methods=["POST"])
-def window_patch_status_update():
-
-    data = request.get_json(silent=True)
-
-    if not data:
-        return jsonify({"error": "Invalid JSON"}), 400
-
-    agent_id   = str(data.get("agent_id", "")).strip()
-    patch_name = str(data.get("patch_name", "")).strip()
-    status     = str(data.get("status", "")).strip().lower()
-
-    if not agent_id or not patch_name or not status:
-        return jsonify({"error": "agent_id, patch_name, status required"}), 400
-
-    allowed_statuses = ["received", "installed", "failed_to_install", "restart_required"]  # ← ADD
-
-    if status not in allowed_statuses:
-        return jsonify({"error": f"Invalid status. Allowed: {allowed_statuses}"}), 400
-
-    status_map = {
-        "received":          (10,  "Patch received by agent",      "received"),
-        "installed":         (100, "Patch installed successfully",  "installed"),
-        "failed_to_install": (0,   "Patch installation failed",     "failed"),
-        "restart_required":  (90,  "Restart required after patch",  "restart_required"),  # ← ADD
-    }
-
-    progress, message, category = status_map[status]
-
-    log_push(agent_id, patch_name, status, progress, message)
-    log_patch_alert(agent_id, patch_name, message, category)
-
-    # ✅ Installed ya restart_required → patch_missing mein deploy_status = 1
-    if status in ["installed", "restart_required"]:
-        mark_patch_installed(agent_id, patch_name)  # ← ADD
-
-    print(f"[PATCH ALERT] Agent: {agent_id} | Patch: {patch_name} | Status: {status}")
-
-    return jsonify({
-        "status":     "updated",
-        "agent_id":   agent_id,
-        "patch_name": patch_name,
-        "new_status": status,
-        "message":    message
-    }), 200
-   
+        return jsonify({"error": str(e)}), 500   
 # =========================================================
 # SERVER STATS
 # =========================================================
@@ -1141,7 +1090,7 @@ def stats():
     return jsonify({
         "memory": get_memory_stats(),
         "agents_alive": len(last_heartbeat),
-        "pending_puh": len(pending_push)
+        "pending_push": len(pending_push)
     })
 
 @api_bp.route("/")
@@ -1176,9 +1125,7 @@ def linux_missing_patches():
                 lp.installed_version,
                 lp.latest_version,
                 lp.patch_type,
-                lp.scan_time,
-                lp.patch_status,
-                lp.updated_at
+                lp.scan_time
             FROM linux_patches lp
             LEFT JOIN devices d ON lp.agent_id = d.agent_id
             WHERE 1=1
@@ -1394,7 +1341,7 @@ def download_by_id():
  
     # Start background download thread
     thread = threading.Thread(
-        target=download_by_ubuntu_rows,
+        target=download_by_rows,
         args=(rows, download_progress),
         daemon=True
     )
@@ -1413,100 +1360,19 @@ def download_by_id():
 # =========================
 @api_bp.route("/api/ubuntu-download-progress")
 def progress():
-    try:
-        conn   = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-
-        cursor.execute("""
-            SELECT 
-                t.patch_id,
-                t.ip_address,
-                t.package_name,
-                t.version,
-                t.status,
-                t.downloaded_at,
-                t.container_log,
-                GROUP_CONCAT(t.file_path SEPARATOR '|') as files
-            FROM patch_download_log t
-            INNER JOIN (
-                SELECT patch_id, MAX(downloaded_at) as max_date
-                FROM patch_download_log
-                GROUP BY patch_id
-            ) latest ON t.patch_id = latest.patch_id
-                     AND t.downloaded_at = latest.max_date
-            GROUP BY t.patch_id, t.ip_address, t.package_name, 
-                     t.version, t.status, t.downloaded_at, t.container_log
-            ORDER BY t.downloaded_at DESC
-        """)
-
-        rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
-
-        items = {}
-        for row in rows:
-            patch_id  = str(row["patch_id"])
-            files     = [f for f in (row["files"] or "").split("|") if f]
-            db_status = (row["status"] or "").lower()
-
-            # ✅ "running" status bhi handle karo
-            if db_status == "running":
-                ui_status = "running"
-                message   = "Download in progress..."
-                logs      = (row["container_log"] or "").split("\n")
-
-            elif db_status in ("skipped", "already_downloaded", "done", "downloaded"):
-                ui_status = "done"
-                message   = f"Downloaded ({len(files)} files)"
-                logs      = (row["container_log"] or "").split("\n")
-
-            elif db_status == "failed":
-                ui_status = "failed"
-                message   = "Download failed"
-                logs      = (row["container_log"] or "").split("\n")
-
-            else:
-                ui_status = "running"
-                message   = "In progress..."
-                logs      = []
-
-            items[patch_id] = {
-                "patch_id"      : row["patch_id"],
-                "ip"            : row["ip_address"],
-                "package"       : row["package_name"],
-                "status"        : ui_status,
-                "files"         : files,
-                "message"       : message,
-                "container_logs": [l for l in logs if l],  # empty lines hatao
-                "downloaded_at" : str(row["downloaded_at"])
-            }
-
-        total   = len(items)
-        done    = sum(1 for i in items.values() if i["status"] == "done")
-        failed  = sum(1 for i in items.values() if i["status"] == "failed")
-        running = sum(1 for i in items.values() if i["status"] == "running")
-        percent = round((done / total * 100), 2) if total else 0
-
-        # ✅ Overall status
-        if running > 0:
-            overall = "in_progress"
-        elif done + failed == total and total > 0:
-            overall = "completed"
-        else:
-            overall = "idle"
-
-        return jsonify({
-            "status"  : overall,
-            "total"   : total,
-            "done"    : done,
-            "failed"  : failed,
-            "running" : running,
-            "percent" : percent,
-            "items"   : items
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    total   = download_progress.get("total", 0)
+    done    = download_progress.get("done", 0)
+    failed  = download_progress.get("failed", 0)
+    percent = round((done / total * 100), 2) if total else 0
+ 
+    return jsonify({
+        "status"  : download_progress.get("status", "idle"),
+        "total"   : total,
+        "done"    : done,
+        "failed"  : failed,
+        "percent" : percent,
+        "items"   : download_progress.get("items", {})
+    })
 # ==============================
 # DOWNLOAD PROGRESS API
 # ==============================
@@ -2203,436 +2069,7 @@ def ubuntu_patch_callback():
     except Exception as e:
         return jsonify({"error": str(e)}), 500 
 
-# =========================
-#  redhat dwonload and progress bar
-# =========================
-redhat_download_progress = {
-    "status" : "idle",
-    "total"  : 0,
-    "done"   : 0,
-    "failed" : 0,
-    "items"  : {}
-}
- 
- 
-# =========================
-# POST /api/redhat-download
-# =========================
-@api_bp.route("/api/redhat-download", methods=["POST"])
-def redhat_download():
-    data = request.get_json()
-    ids  = data.get("ids")
- 
-    if not ids:
-        return jsonify({"error": "ids required"}), 400
- 
-    # Single id → list
-    if not isinstance(ids, list):
-        ids = [ids]
- 
-    conn   = get_db_connection()
-    cursor = conn.cursor()
- 
-    placeholders = ",".join(["%s"] * len(ids))
-    query = f"""
-        SELECT
-            id,
-            ip_address,
-            package_name,
-            version,
-            repo,
-            agent_id
-        FROM redhat_patch_list
-        WHERE id IN ({placeholders})
-    """
-    cursor.execute(query, ids)
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
- 
-    if not rows:
-        return jsonify({"error": "No patches found"}), 404
- 
-    # Reset progress store
-    redhat_download_progress.update({
-        "status" : "started",
-        "total"  : len(rows),
-        "done"   : 0,
-        "failed" : 0,
-        "items"  : {}
-    })
- 
-    # Build response + pre-populate progress items
-    packages = []
-    for row in rows:
-        patch_id, ip, pkg, version, repo, agent_id = row
-        packages.append({
-            "id"          : patch_id,
-            "ip_address"  : ip,
-            "package_name": pkg,
-            "version"     : version,
-            "repo"        : repo,
-            "agent_id"    : agent_id
-        })
-        redhat_download_progress["items"][str(patch_id)] = {
-            "patch_id" : patch_id,
-            "ip"       : ip,
-            "package"  : pkg,
-            "status"   : "queued",
-            "files"    : [],
-            "message"  : "Waiting..."
-        }
- 
-    # Background thread start
-    thread = threading.Thread(
-        target=download_by_redhat_rows,
-        args=(rows, redhat_download_progress),
-        daemon=True
-    )
-    thread.start()
- 
-    return jsonify({
-        "status"   : "started",
-        "total"    : len(rows),
-        "packages" : packages
-    })
- 
- 
-# =========================
-# GET /api/redhat-download-progress
-# =========================
-@api_bp.route("/api/redhat-download-progress")
-def redhat_progress():
-    try:
-        conn   = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
- 
-        cursor.execute("""
-            SELECT
-                t.patch_id,
-                t.ip_address,
-                t.package_name,
-                t.version,
-                t.status,
-                t.downloaded_at,
-                t.container_log,
-                GROUP_CONCAT(t.file_path SEPARATOR '|') as files
-            FROM patch_download_log t
-            INNER JOIN (
-                SELECT patch_id, MAX(downloaded_at) as max_date
-                FROM patch_download_log
-                GROUP BY patch_id
-            ) latest ON t.patch_id = latest.patch_id
-                     AND t.downloaded_at = latest.max_date
-            GROUP BY t.patch_id, t.ip_address, t.package_name,
-                     t.version, t.status, t.downloaded_at, t.container_log
-            ORDER BY t.downloaded_at DESC
-        """)
- 
-        rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
- 
-        items = {}
-        for row in rows:
-            patch_id  = str(row["patch_id"])
-            files     = [f for f in (row["files"] or "").split("|") if f]
-            db_status = (row["status"] or "").lower()
- 
-            if db_status == "running":
-                ui_status = "running"
-                message   = "Download in progress..."
-            elif db_status in ("skipped", "already_downloaded", "done", "downloaded"):
-                ui_status = "done"
-                message   = f"Downloaded ({len(files)} files)"
-            elif db_status == "failed":
-                ui_status = "failed"
-                message   = "Download failed"
-            else:
-                ui_status = "running"
-                message   = "In progress..."
- 
-            logs = (row["container_log"] or "").split("\n")
- 
-            items[patch_id] = {
-                "patch_id"      : row["patch_id"],
-                "ip"            : row["ip_address"],
-                "package"       : row["package_name"],
-                "version"       : row["version"],
-                "status"        : ui_status,
-                "files"         : files,
-                "message"       : message,
-                "container_logs": [l for l in logs if l],
-                "downloaded_at" : str(row["downloaded_at"])
-            }
- 
-        total   = len(items)
-        done    = sum(1 for i in items.values() if i["status"] == "done")
-        failed  = sum(1 for i in items.values() if i["status"] == "failed")
-        running = sum(1 for i in items.values() if i["status"] == "running")
-        percent = round((done / total * 100), 2) if total else 0
- 
-        if running > 0:
-            overall = "in_progress"
-        elif done + failed == total and total > 0:
-            overall = "completed"
-        else:
-            overall = "idle"
- 
-        return jsonify({
-            "status"  : overall,
-            "total"   : total,
-            "done"    : done,
-            "failed"  : failed,
-            "running" : running,
-            "percent" : percent,
-            "items"   : items
-        })
- 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
- 
-#logger = logging.getLogger(__name__)
- 
-deploy_bp    = Blueprint("redhat_deploy", __name__)
-DOWNLOAD_DIR = Path.home() / "rhel10-repo" / "patches"
- 
- 
-# =============================================
-# POST /api/redhat-deploy
-# Frontend se call hota hai — deploy queue mein add karo
-# Body: { "patch_ids": [963, 964], "agent_id": "xxx", "scheduled_at": "2026-03-31 22:00" }
-# =============================================
-@deploy_bp.route("/api/redhat-deploy", methods=["POST"])
-def redhat_deploy():
-    data         = request.get_json()
-    patch_ids    = data.get("patch_ids") or data.get("ids") or []
-    agent_id     = data.get("agent_id", "")
-    scheduled_at = data.get("scheduled_at")   # None = deploy abhi
- 
-    if not patch_ids:
-        return jsonify({"error": "patch_ids required"}), 400
-    if not agent_id:
-        return jsonify({"error": "agent_id required"}), 400
- 
-    if not isinstance(patch_ids, list):
-        patch_ids = [patch_ids]
- 
-    queued  = []
-    failed  = []
- 
-    for pid in patch_ids:
-        ok = queue_deploy(
-            patch_id     = int(pid),
-            agent_id     = agent_id,
-            scheduled_at = scheduled_at
-        )
-        if ok:
-            queued.append(pid)
-        else:
-            failed.append(pid)
- 
-    if not queued:
-        return jsonify({
-            "error"  : "No patches queued — check if RPMs are downloaded first",
-            "failed" : failed
-        }), 400
- 
-    return jsonify({
-        "status"      : "queued",
-        "queued"      : queued,
-        "failed"      : failed,
-        "scheduled_at": scheduled_at or "immediate",
-        "message"     : f"{len(queued)} patch(es) deploy queue mein add ho gaye"
-    })
- 
- 
-# =============================================
-# GET /api/redhat-patch-check?agent_id=xxx
-# Agent yahan se pending patches fetch karta hai
-# Agent loop mein isko call karta hai (polling)
-# =============================================
-@deploy_bp.route("/api/redhat-patch-check", methods=["GET"])
-def redhat_patch_check():
-    agent_id = request.args.get("agent_id", "")
-    if not agent_id:
-        return jsonify({"patches": []})
- 
-    pending = get_pending_deploys(agent_id)
- 
-    if not pending:
-        return jsonify({"patches": []})
- 
-    patches_response = []
- 
-    for deploy in pending:
-        patch_id     = deploy["patch_id"]
-        package_name = deploy["package_name"]
-        version      = deploy["version"]
-        ip_address   = deploy["ip_address"]
-        deploy_id    = deploy["id"]
- 
-        # RPM files list karo
-        dest      = DOWNLOAD_DIR / f"{ip_address}_{patch_id}"
-        rpm_files = list(dest.glob("*.rpm")) if dest.exists() else []
- 
-        if not rpm_files:
-            update_deploy_status(deploy_id, "failed", "No RPM files found on server")
-            continue
- 
-        # Files info build karo — agent inhe download karega
-        files_info = []
-        for rpm in rpm_files:
-            files_info.append({
-                "name": rpm.name,
-                "url" : f"/api/redhat-patch-file/{ip_address}_{patch_id}/{rpm.name}",
-                "size": rpm.stat().st_size
-            })
- 
-        # Status → sent
-        update_deploy_status(deploy_id, "sent", f"Sent {len(rpm_files)} files to agent")
- 
-        patches_response.append({
-            "patch_id"  : patch_id,
-            "deploy_id" : deploy_id,
-            "package"   : package_name,
-            "version"   : version,
-            "files"     : files_info
-        })
- 
-    return jsonify({"patches": patches_response})
- 
- 
-# =============================================
-# GET /api/redhat-patch-file/<folder>/<filename>
-# Agent RPM file yahan se download karta hai
-# =============================================
-@deploy_bp.route("/api/redhat-patch-file/<folder>/<filename>", methods=["GET"])
-def serve_patch_file(folder, filename):
-    # Security: path traversal block karo
-    safe_folder   = os.path.basename(folder)
-    safe_filename = os.path.basename(filename)
-    file_path     = DOWNLOAD_DIR / safe_folder / safe_filename
- 
-    if not file_path.exists():
-        return jsonify({"error": "File not found"}), 404
- 
-    return send_file(str(file_path), as_attachment=True)
- 
- 
-# =============================================
-# POST /api/redhat-patch-done
-# Agent install hone ke baad yahan callback bhejta hai
-# Body: { "agent_id": "xxx", "patch_id": 963, "deploy_id": 5,
-#          "package": "libgcc", "status": "installed",
-#          "message": "...", "downloaded_files": [...], "failed_files": [...] }
-# =============================================
-@deploy_bp.route("/api/redhat-patch-done", methods=["POST"])
-def redhat_patch_done():
-    data      = request.get_json()
-    agent_id  = data.get("agent_id", "")
-    patch_id  = data.get("patch_id")
-    deploy_id = data.get("deploy_id")
-    status    = data.get("status", "unknown")   # received / installed / failed
-    message   = data.get("message", "")
- 
-    print(f"📡 Patch callback: agent={agent_id}, patch={patch_id}, status={status}")
- 
-    try:
-        conn   = get_db_connection()
-        cursor = conn.cursor()
- 
-        # ✅ Sirf patch_status aur updated_at update karo
-        cursor.execute(
-            """
-            UPDATE redhat_patch_list
-            SET patch_status = %s,
-                updated_at   = NOW()
-            WHERE id = %s AND agent_id = %s
-            """,
-            (status, patch_id, agent_id)
-        )
- 
-        conn.commit()
-        cursor.close()
-        conn.close()
- 
-    except Exception as e:
-        logger.error(f"DB update error in patch_done: {e}")
- 
-    return jsonify({
-        "status" : "ok",
-        "message": f"Callback received: {status}"
-    })
- 
- 
-# =============================================
-# GET /api/redhat-deploy-status?agent_id=xxx
-# Frontend ke liye — deploy progress
-# =============================================
-@deploy_bp.route("/api/redhat-deploy-status", methods=["GET"])
-def redhat_deploy_status():
-    agent_id = request.args.get("agent_id", "")
-    if not agent_id:
-        return jsonify({"error": "agent_id required"}), 400
- 
-    rows = get_deploy_status(agent_id=agent_id)
- 
-    items   = {}
-    for row in rows:
-        pid = str(row["patch_id"])
- 
-        db_status = (row["status"] or "").lower()
-        if db_status == "installed":
-            ui_status = "done"
-            message   = "✓ Installed successfully"
-        elif db_status == "failed":
-            ui_status = "failed"
-            message   = row["message"] or "Installation failed"
-        elif db_status in ("sent", "installing"):
-            ui_status = "running"
-            message   = "Installing on device..."
-        else:
-            ui_status = "pending"
-            message   = "Waiting for agent..."
- 
-        items[pid] = {
-            "patch_id"    : row["patch_id"],
-            "package"     : row["package_name"],
-            "version"     : row["version"],
-            "ip"          : row["ip_address"],
-            "status"      : ui_status,
-            "message"     : message,
-            "scheduled_at": str(row["scheduled_at"]) if row["scheduled_at"] else None,
-            "deployed_at" : str(row["deployed_at"])  if row["deployed_at"]  else None,
-        }
- 
-    total      = len(items)
-    done       = sum(1 for i in items.values() if i["status"] == "done")
-    failed     = sum(1 for i in items.values() if i["status"] == "failed")
-    running    = sum(1 for i in items.values() if i["status"] == "running")
-    pending    = sum(1 for i in items.values() if i["status"] == "pending")
-    percent    = round(done / total * 100, 2) if total else 0
- 
-    if running > 0:
-        overall = "in_progress"
-    elif done + failed == total and total > 0:
-        overall = "completed"
-    elif pending > 0:
-        overall = "pending"
-    else:
-        overall = "idle"
- 
-    return jsonify({
-        "status" : overall,
-        "total"  : total,
-        "done"   : done,
-        "failed" : failed,
-        "running": running,
-        "pending": pending,
-        "percent": percent,
-        "items"  : items
-    })
+
 
 
 if __name__ == "__main__":

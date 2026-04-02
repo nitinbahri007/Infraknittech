@@ -117,10 +117,6 @@ VIRTUAL_PACKAGES = [
 # Parallel workers
 MAX_WORKERS = 6
 
-# ✅ Max container log size before truncation (~60KB safe for TEXT column)
-# Run this SQL once: ALTER TABLE patch_download_log MODIFY COLUMN container_log MEDIUMTEXT;
-MAX_CONTAINER_LOG_SIZE = 60000
-
 
 # =========================
 # DOCKER IMAGE SETUP
@@ -129,6 +125,7 @@ def setup_docker_images():
     """
     Build pre-configured Docker images with repos already set up.
     Run once at server start — saves time on every download.
+    ✅ lsb-release + whiptail included for ntop support.
     """
     images = {
         "nms-ubuntu:22.04": """
@@ -231,24 +228,6 @@ def get_docker_image(os_type, version_key):
 # =========================
 # HELPERS
 # =========================
-def truncate_log(log_str):
-    """
-    ✅ Truncate container log if too large for DB column.
-    Keeps first half + last half with a marker in between.
-    Run SQL: ALTER TABLE patch_download_log MODIFY COLUMN container_log MEDIUMTEXT;
-    """
-    if not log_str:
-        return ""
-    if len(log_str) <= MAX_CONTAINER_LOG_SIZE:
-        return log_str
-    half = MAX_CONTAINER_LOG_SIZE // 2
-    return (
-        log_str[:half] +
-        "\n\n... [log truncated — middle portion removed] ...\n\n" +
-        log_str[-half:]
-    )
-
-
 def sanitize_version(v):
     """Clean junk version strings like 'external_repo', 'outdated'."""
     if str(v).lower().strip() in JUNK_VERSIONS:
@@ -318,20 +297,21 @@ def cleanup_folder(path):
 
 # =========================
 # DB FUNCTIONS
-# patch_download_log → one row per file
-# patch_alert        → ONE row per patch
+# ✅ FIXED: patch_download_log and patch_alert are now separate
+#    patch_download_log → one row per file (22 files = 22 rows)
+#    patch_alert        → ONE row per patch always
 # =========================
+
 def log_file_to_db(patch_id, ip, package, version,
                    file_path, status, now, container_log=""):
     """
     Insert ONE row into patch_download_log per file.
-    ✅ Truncates container_log before insert to avoid column overflow.
+    Called in a loop for each downloaded file.
     Does NOT insert into patch_alert.
     """
     try:
-        conn     = get_db_connection()
-        cursor   = conn.cursor()
-        safe_log = truncate_log(container_log)  # ✅ truncate here
+        conn   = get_db_connection()
+        cursor = conn.cursor()
 
         cursor.execute("""
             INSERT INTO patch_download_log
@@ -339,7 +319,7 @@ def log_file_to_db(patch_id, ip, package, version,
                  file_path, status, downloaded_at, container_log)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (patch_id, ip, package, version,
-              file_path, status, now, safe_log))
+              file_path, status, now, container_log))
 
         conn.commit()
         cursor.close()
@@ -352,7 +332,7 @@ def log_file_to_db(patch_id, ip, package, version,
 def log_alert_to_db(agent_id, package, message, category):
     """
     Insert ONE row into patch_alert per patch.
-    Called ONCE after all files processed — not per file.
+    Called ONCE after all files are processed — not per file.
     """
     try:
         conn   = get_db_connection()
@@ -400,14 +380,10 @@ def insert_running_log(patch_id, agent_id, ip, package, version):
 
 
 def update_running_log_in_db(patch_id, container_log):
-    """
-    Update running record every 5 lines — refresh shows latest logs.
-    ✅ Truncates log before update.
-    """
+    """Update running record every 5 lines — refresh shows latest logs."""
     try:
-        conn     = get_db_connection()
-        cursor   = conn.cursor()
-        safe_log = truncate_log(container_log)  # ✅ truncate here
+        conn   = get_db_connection()
+        cursor = conn.cursor()
 
         cursor.execute("""
             UPDATE patch_download_log
@@ -415,7 +391,7 @@ def update_running_log_in_db(patch_id, container_log):
             WHERE patch_id = %s AND status = 'running'
             ORDER BY downloaded_at DESC
             LIMIT 1
-        """, (safe_log, patch_id))
+        """, (container_log, patch_id))
 
         conn.commit()
         cursor.close()
@@ -689,7 +665,9 @@ def download_single_patch(patch_id, ip, os_version, package, patch_type,
             "container_logs" : [f"⏭️  {msg}"]
         })
         progress_store["done"] += 1
+
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # ✅ 1 file log + 1 alert
         log_file_to_db(patch_id, ip, actual_package, latest_version,
                        "", "skipped", now, container_log=msg)
         log_alert_to_db(agent_id, actual_package, msg, "VIRTUAL_PACKAGE")
@@ -711,8 +689,10 @@ def download_single_patch(patch_id, ip, os_version, package, patch_type,
             "container_logs" : ["⏭️  Skipped — already downloaded"]
         })
         progress_store["done"] += 1
+
         now       = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         file_path = os.path.join(final_dest, existing[0]) if existing else final_dest
+        # ✅ 1 file log + 1 alert
         log_file_to_db(patch_id, ip, actual_package, latest_version,
                        file_path, "skipped", now,
                        container_log="Skipped — already downloaded")
@@ -738,9 +718,7 @@ def download_single_patch(patch_id, ip, os_version, package, patch_type,
         docker_cmd, patch_id, progress_store
     )
 
-    # ✅ Truncate once here — reuse for all DB calls below
-    container_log_str = truncate_log("\n".join(container_logs))
-
+    container_log_str = "\n".join(container_logs)
     time.sleep(1)
 
     skip = {"ntop-bootstrap.deb", "apt-ntop-stable.deb", "apt-ntop.deb"}
@@ -796,14 +774,14 @@ def download_single_patch(patch_id, ip, os_version, package, patch_type,
     })
     progress_store["done"] += 1
 
-    # ✅ patch_download_log → one row per file (container_log already truncated)
+    # ✅ patch_download_log → one row per file (22 files = 22 rows)
     for f in moved:
         file_path = os.path.join(final_dest, f)
         log_file_to_db(patch_id, ip, actual_package, latest_version,
                        file_path, "downloaded", now,
                        container_log=container_log_str)
 
-    # ✅ patch_alert → ONE row per patch regardless of file count
+    # ✅ patch_alert → ONLY ONE row per patch regardless of file count
     log_alert_to_db(agent_id, actual_package, msg, "DOWNLOADED")
 
     return "SUCCESS"
@@ -820,7 +798,6 @@ def download_by_ubuntu_rows(rows, progress_store):
     ✅ MAX_WORKERS=6 parallel downloads.
     ✅ ntop fix: wget always available, version URL, lsb-release+whiptail.
     ✅ patch_alert: ONE alert per patch, not per file.
-    ✅ container_log: truncated before DB insert — no more column overflow.
     ✅ Refresh recovery via DB running log.
     """
     progress_store["status"] = "running"

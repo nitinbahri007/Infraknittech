@@ -14,16 +14,12 @@ import socket
 import platform
 import os
 from api import api_bp
-from api import deploy_bp
-from usermanagement import api_bp as user_bp
-from auth import auth_bp
+
 from linuxpatchupload5 import process_uploaded_packages
 app = Flask(__name__)
 
 app.register_blueprint(api_bp)
-app.register_blueprint(user_bp)
-app.register_blueprint(deploy_bp)
-app.register_blueprint(auth_bp)
+
 
 # ================= CONFIG =================
 HEARTBEAT_TIMEOUT = 40
@@ -35,169 +31,94 @@ expected_agents = []
 # ================= HEARTBEAT NEW  =================
 @app.route("/api/heartbeat", methods=["POST"])
 def heartbeat():
- 
+
     print("🔥 HEARTBEAT API CALLED")
- 
+
     data = request.json or {}
     print("🔥 DATA RECEIVED:")
     print(data)
     agent_id = data.get("agent_id")
- 
+
     if not agent_id:
         print("❌ agent_id missing")
         return jsonify({"error": "agent_id missing"}), 400
- 
-    hostname        = data.get("hostname")        or socket.gethostname()
-    ip_address      = data.get("ip_address")      or request.remote_addr
-    os_name         = data.get("os_name")         or data.get("os")         or platform.system()
-    os_version      = data.get("os_version")      or platform.version()
+
+    hostname = data.get("hostname") or socket.gethostname()
+    ip_address = data.get("ip_address") or request.remote_addr
+    os_name = data.get("os_name") or platform.system()
+    os_version = data.get("os_version") or platform.version()
     os_architecture = data.get("os_architecture") or platform.machine()
-    agent_version   = data.get("agent_version")   or "1.0"
- 
+    agent_version = data.get("agent_version") or "1.0"
+
     now = datetime.now()
- 
+
     print("📡 Heartbeat received")
     print("Agent ID:", agent_id)
     print("Hostname:", hostname)
     print("IP:", ip_address)
     print("OS:", os_name, os_version)
     print("Agent Version:", agent_version)
- 
+
     last_heartbeat[agent_id] = now
- 
+
     try:
-        conn   = get_db_connection()
+        conn = get_db_connection()
         cursor = conn.cursor()
- 
+
         print("💾 Updating DB...")
- 
-        # =========================
-        # CHANGED 25-03-2026 — patch_alert helper
-        # Alag connection use karo — shared cursor commit issue fix
-        # =========================
-        def insert_device_alert(aid, message, category):
-            try:
-                _conn = get_db_connection()
-                _cur  = _conn.cursor()
-                _cur.execute("""
-                    INSERT INTO patch_alert
-                        (agent_id, kb, message, category, created_at)
-                    VALUES (%s, %s, %s, %s, NOW())
-                """, (aid, "", message, category))
-                _conn.commit()
-                _cur.close()
-                _conn.close()
-                print(f"✅ patch_alert commit done: {category}")
-            except Exception as ae:
-                print(f"⚠️  patch_alert insert error: {ae}")
- 
-        # =========================
-        # CHANGED 25-03-2026 — fetch current status before update
-        # =========================
+
+        # 🔥 NEW LOGIC: Same IP ke dusre agents disable karo
         cursor.execute("""
-            SELECT status FROM devices WHERE agent_id = %s
-        """, (agent_id,))
-        existing    = cursor.fetchone()
-        prev_status = existing[0] if existing else None
- 
-        print(f"DEBUG prev_status DB  : {prev_status}")
- 
-        # CHANGED 25-03-2026 — race condition fix
-        # monitor_agents dict mein turant OFFLINE karta hai
-        # lekin DB update thoda late hota hai
-        # dict ko priority do
-        dict_status = device_status.get(agent_id)
-        print(f"DEBUG prev_status DICT: {dict_status}")
- 
-        if prev_status == "ONLINE" and dict_status == "OFFLINE":
-            prev_status = "OFFLINE"
-            print(f"DEBUG prev_status OVERRIDE → OFFLINE (race condition fix)")
- 
-        # =========================
-        # Same IP ke dusre agents disable karo
-        # =========================
-        cursor.execute("""
-            SELECT agent_id FROM devices
-            WHERE ip_address = %s AND agent_id != %s AND status != 'DISABLED'
+        UPDATE devices 
+        SET status='DISABLED', updated_at=NOW()
+        WHERE ip_address=%s AND agent_id != %s
         """, (ip_address, agent_id))
-        agents_to_disable = cursor.fetchall()
- 
+
+        # 🔥 EXISTING LOGIC (unchanged)
         cursor.execute("""
-            UPDATE devices
-            SET status = 'DISABLED', updated_at = NOW()
-            WHERE ip_address = %s AND agent_id != %s
-        """, (ip_address, agent_id))
- 
-        # CHANGED 25-03-2026 — alert for each disabled agent
-        for (disabled_aid,) in agents_to_disable:
-            insert_device_alert(
-                disabled_aid,
-                f"Device disabled — same IP ({ip_address}) now used by another agent",
-                "DEVICE_DISABLED"
-            )
-            print(f"⚠️  Agent {disabled_aid[:12]}.. DISABLED (same IP)")
- 
-        # =========================
-        # Insert / Update device
-        # =========================
-        cursor.execute("""
-            INSERT INTO devices (
-                agent_id, hostname, ip_address, os_name,
-                os_version, os_architecture,
-                agent_version, last_heartbeat, status, updated_at
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), 'ONLINE', NOW())
-            ON DUPLICATE KEY UPDATE
-                hostname        = VALUES(hostname),
-                ip_address      = VALUES(ip_address),
-                os_name         = VALUES(os_name),
-                os_version      = VALUES(os_version),
-                os_architecture = VALUES(os_architecture),
-                agent_version   = VALUES(agent_version),
-                last_heartbeat  = NOW(),
-                status          = 'ONLINE',
-                updated_at      = NOW()
+        INSERT INTO devices (
+            agent_id, hostname, ip_address, os_name,
+            os_version, os_architecture,
+            agent_version, last_heartbeat, status, updated_at
+        )
+        VALUES (%s,%s,%s,%s,%s,%s,%s,NOW(),'ONLINE',NOW())
+        ON DUPLICATE KEY UPDATE
+            hostname=VALUES(hostname),
+            ip_address=VALUES(ip_address),
+            os_name=VALUES(os_name),
+            os_version=VALUES(os_version),
+            os_architecture=VALUES(os_architecture),
+            agent_version=VALUES(agent_version),
+            last_heartbeat=NOW(),
+            status='ONLINE',
+            updated_at=NOW()
         """, (
-            agent_id, hostname, ip_address,
-            os_name, os_version, os_architecture, agent_version
+            agent_id,
+            hostname,
+            ip_address,
+            os_name,
+            os_version,
+            os_architecture,
+            agent_version
         ))
- 
+
         conn.commit()
+
         print("✅ DB updated")
+        print("Rows affected:", cursor.rowcount)
+
         cursor.close()
         conn.close()
- 
-        # =========================
-        # CHANGED 25-03-2026 — patch_alert for ONLINE
-        # conn.commit() ke BAAD karo
-        # Rules:
-        #   OFFLINE  → ONLINE : alert ✅
-        #   None     → ONLINE : alert ✅ (new device)
-        #   DISABLED → ONLINE : no alert ❌
-        #   ONLINE   → ONLINE : no alert ❌ (duplicate)
-        # =========================
-        if prev_status == "OFFLINE":
-            msg = f"Device came back online ({hostname} / {ip_address})"
-            insert_device_alert(agent_id, msg, "DEVICE_ONLINE")
-            print(f"✅ patch_alert inserted: DEVICE_ONLINE (was OFFLINE)")
- 
-        elif prev_status is None:
-            msg = f"New device registered ({hostname} / {ip_address})"
-            insert_device_alert(agent_id, msg, "DEVICE_ONLINE")
-            print(f"✅ patch_alert inserted: DEVICE_ONLINE (new device)")
- 
-        else:
-            print(f"ℹ️  No patch_alert — prev_status was: {prev_status}")
- 
+
         device_status[agent_id] = "ONLINE"
+
         print(f"[{now.strftime('%H:%M:%S')}] ❤️ {agent_id} ONLINE")
- 
+
     except Exception as e:
         print("❌ DB ERROR:", e)
         traceback.print_exc()
- 
-    return jsonify({"status": "alive", "test": "nitin"}), 200
 
+    return jsonify({"status": "alive", "test": "nitin"}), 200
 # ================= PATCH REPORT =================
 @app.route("/api/report", methods=["POST"])
 def receive_report():
@@ -277,11 +198,6 @@ def process_report_background(data):
     except Exception:
         print("❌ Report processing error:")
         traceback.print_exc()
-    finally:
-        try:
-            if cursor: cursor.close()
-            if conn:   conn.close()
-        except: pass
 
 # ================= DEVICE REFRESH =================
 def refresh_devices():
@@ -306,108 +222,28 @@ def refresh_devices():
 # ================= OFFLINE MONITOR =================
 def monitor_agents():
     print("🛡 Offline monitor running")
- 
+
     while True:
         now = datetime.now()
- 
+
         for agent_id in expected_agents:
             last = last_heartbeat.get(agent_id)
- 
+
             if not last or (now - last).total_seconds() > HEARTBEAT_TIMEOUT:
                 if device_status.get(agent_id) != "OFFLINE":
- 
-                    # CHANGED 25-03-2026 — DB se current status check karo
-                    # Server restart pe sab agents OFFLINE nahi hone chahiye
-                    # Sirf ONLINE → OFFLINE transition pe alert
-                    try:
-                        _c   = get_db_connection()
-                        _cur = _c.cursor()
-                        _cur.execute(
-                            "SELECT status FROM devices WHERE agent_id = %s",
-                            (agent_id,)
-                        )
-                        row            = _cur.fetchone()
-                        _cur.close()
-                        _c.close()
-                        db_current_status = row[0] if row else None
-                    except:
-                        db_current_status = None
- 
-                    # Agar DB mein already OFFLINE hai — dict sync karo, alert mat do
-                    if db_current_status == "OFFLINE":
-                        device_status[agent_id] = "OFFLINE"
-                        continue
- 
-                    # Agar DISABLED hai — OFFLINE mat karo
-                    if db_current_status == "DISABLED":
-                        device_status[agent_id] = "OFFLINE"
-                        continue
- 
                     print(f"[{now.strftime('%H:%M:%S')}] 🔴 {agent_id} OFFLINE")
- 
+
                     try:
                         update_device_status(agent_id, "OFFLINE")
                         start_outage(agent_id)
                         device_status[agent_id] = "OFFLINE"
- 
-                        # CHANGED 25-03-2026 — patch_alert for OFFLINE
-                        try:
-                            _conn = get_db_connection()
-                            _cur  = _conn.cursor()
- 
-                            _cur.execute("""
-                                SELECT hostname, ip_address
-                                FROM devices WHERE agent_id = %s
-                            """, (agent_id,))
-                            row = _cur.fetchone()
- 
-                            if row:
-                                hostname, ip = row
- 
-                                # Duplicate check — 60s mein same alert nahi
-                                _cur.execute("""
-                                    SELECT TIMESTAMPDIFF(SECOND, created_at, NOW())
-                                    FROM patch_alert
-                                    WHERE agent_id = %s
-                                    AND category = 'DEVICE_OFFLINE'
-                                    ORDER BY created_at DESC
-                                    LIMIT 1
-                                """, (agent_id,))
-                                diff_row      = _cur.fetchone()
-                                should_insert = True
- 
-                                if diff_row and diff_row[0] < 60:
-                                    should_insert = False
- 
-                                if should_insert:
-                                    _cur.execute("""
-                                        INSERT INTO patch_alert
-                                            (agent_id, kb, message, category, created_at)
-                                        VALUES (%s, %s, %s, %s, NOW())
-                                    """, (
-                                        agent_id,
-                                        "",
-                                        f"Device went offline ({hostname} / {ip})",
-                                        "DEVICE_OFFLINE"
-                                    ))
-                                    _conn.commit()
-                                    print(f"[MONITOR] ✅ patch_alert: DEVICE_OFFLINE")
-                                else:
-                                    print(f"[MONITOR] ℹ️  Duplicate skip: DEVICE_OFFLINE")
- 
-                            _cur.close()
-                            _conn.close()
- 
-                        except Exception as alert_err:
-                            print(f"[MONITOR] patch_alert error: {alert_err}")
- 
                     except Exception as e:
                         print("Offline error:", e)
- 
+
         time.sleep(2)
- 
+
+
 # ================= DASHBOARD =================
-"""
 @app.route("/dashboard")
 def dashboard():
     conn = get_db_connection()
@@ -417,7 +253,7 @@ def dashboard():
     cursor.close()
     conn.close()
     return render_template("dashboard.html", devices=devices)
-"""
+
 
 @app.route("/")
 def home():

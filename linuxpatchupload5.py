@@ -5,7 +5,8 @@ import re
 import json
 from db import get_db_connection
 
-UPLOAD_DIR = "uploads"
+#UPLOAD_DIR = "uploads"
+UPLOAD_DIR = "other_patches"
 CACHE_FILE = "repo_cache.json"
 
 # ===============================
@@ -145,7 +146,8 @@ def load_repo_data():
 # ===============================
 # FILTERS
 # ===============================
-EXTERNAL_KEYWORDS = ["mongo", "mysql", "ntop", "nprobe", "ndpi", "pfring", "python"]
+#EXTERNAL_KEYWORDS = ["mongo", "mysql", "ntop", "nprobe", "ndpi", "pfring", "python"]
+EXTERNAL_KEYWORDS = ["mongo", "mysql", "ntop", "nprobe", "ndpi", "pfring", "python", "py", "zypper", "xserver", "xmms2-plugin", "xubuntu", "xfonts", "xf", "xfs", "sp", "sq", "sql", "s", "ruby", "rt", "rsyslog", "r", "q", "a", "b", "c", "d","e","f","g","h","i","j","k","m","n","o","p","l","q","r","s","t","u","v","w","x","y","z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
 META_PACKAGES = {
     "default-jre-headless",

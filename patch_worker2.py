@@ -38,7 +38,7 @@ def download_file(agent_id, msu_url, file_path, kb, title):
         downloaded = 0
         last_sent = -1
 
-        # Start state
+        # 🔹 Start state
         update_patch_progress(agent_id, title, kb, 0, "DOWNLOADING")
         update_patch_install_progress(agent_id, kb, 0, "DOWNLOADING")
 
@@ -64,21 +64,21 @@ def download_file(agent_id, msu_url, file_path, kb, title):
                     if percent != last_sent:
                         last_sent = percent
 
-                        # Live update — max 99% during download
-                        update_patch_progress(agent_id, title, kb, min(percent, 99), "DOWNLOADING")
-                        update_patch_install_progress(agent_id, kb, min(percent, 99), "DOWNLOADING")
+                        # 🔥 LIVE UPDATE BOTH TABLES
+                        update_patch_progress(agent_id, title, kb, percent, "DOWNLOADING")
+                        update_patch_install_progress(agent_id, kb, percent, "DOWNLOADING")
 
         # ================= SUCCESS =================
-        # Download 100% complete — mark as READY_TO_INSTALL
         update_patch_progress(agent_id, title, kb, 100, "DOWNLOADED")
-        update_patch_install_progress(agent_id, kb, 100, "READY_TO_INSTALL")  # ← FIXED
+
+        # install queue ready
 
         insert_patch_alert(agent_id, kb, f"{kb} download completed", "DOWNLOAD")
 
     except Exception as e:
         print("❌ Download failed:", e)
 
-        # Remove partial file
+        # 🧹 Remove partial file
         if os.path.exists(file_path):
             os.remove(file_path)
 
@@ -169,10 +169,10 @@ def process_patch(agent_id, patch_title):
         filename = msu_url.split("/")[-1]
         file_path = os.path.join(base_dir, filename)
 
-        # Already downloaded — directly mark READY_TO_INSTALL
+        # already downloaded
         if os.path.exists(file_path):
             update_patch_progress(agent_id, patch_title, kb_id, 100, "DOWNLOADED")
-            update_patch_install_progress(agent_id, kb_id, 100, "READY_TO_INSTALL")  # ← FIXED
+            update_patch_install_progress(agent_id, kb_id, 100, "READY_TO_INSTALL")
             return
 
         download_file(agent_id, msu_url, file_path, kb_id, patch_title)
